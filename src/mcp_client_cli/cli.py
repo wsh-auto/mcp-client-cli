@@ -114,14 +114,23 @@ class AgentState(TypedDict):
     is_last_step: IsLastStep
     today_datetime: str
 
-async def main() -> None:
+async def run() -> None:
     parser = argparse.ArgumentParser(description='Run LangChain agent with MCP tools')
-    parser.add_argument('query', nargs='?', default=DEFAULT_QUERY,
+    parser.add_argument('query', nargs='*', default=DEFAULT_QUERY.split(),
                        help='The query to process (default: summarize a YouTube video)')
     args = parser.parse_args()
+    
+    # Join query words into a single string
+    query = ' '.join(args.query) if args.query else DEFAULT_QUERY
 
-    with open(CONFIG_FILE, 'r') as f:
-        server_config = json.load(f)
+    config_paths = [CONFIG_FILE, os.path.expanduser("~/.llm/config.json")]
+    for path in config_paths:
+        if os.path.exists(path):
+            with open(path, 'r') as f:
+                server_config = json.load(f)
+            break
+    else:
+        raise FileNotFoundError(f"Could not find config file in any of: {', '.join(config_paths)}")
     
     server_params = [
         StdioServerParameters(
@@ -150,7 +159,7 @@ async def main() -> None:
     agent_executor = create_react_agent(model, langchain_tools, state_schema=AgentState, state_modifier=prompt)
     
     input_messages = {
-        "messages": [HumanMessage(content=args.query)], 
+        "messages": [HumanMessage(content=query)], 
         "today_datetime": datetime.now().isoformat(),
     }
     async for response in agent_executor.astream(
@@ -161,5 +170,8 @@ async def main() -> None:
         message = response["messages"][-1]
         message.pretty_print()
 
+def main() -> None:
+    asyncio.run(run())
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
