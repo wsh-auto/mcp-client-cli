@@ -29,6 +29,7 @@ class McpToolkit(BaseToolkit):
     _session: Optional[ClientSession] = None
     _tools: List[BaseTool] = []
     _client = None
+    _prompts: List[types.Prompt] = []
 
     model_config = pydantic.ConfigDict(arbitrary_types_allowed=True)
 
@@ -45,15 +46,22 @@ class McpToolkit(BaseToolkit):
 
     async def initialize(self, force_refresh: bool = False):
         cached_tools = get_cached_tools(self.server_param)
-        if  cached_tools and not force_refresh:
+        cached_prompts = get_cached_prompts(self.server_param)
+        if not force_refresh and (cached_tools or cached_prompts):
             for tool in cached_tools:
                 self._tools.append(create_langchain_tool(tool, self._session, self))
+            self._prompts = cached_prompts
             return
 
         try:
             await self._start_session()
             tools: types.ListToolsResult = await self._session.list_tools()
-            save_tools_cache(self.server_param, tools.tools)
+            try:
+                prompts: types.ListPromptsResult = await self._session.list_prompts()
+                self._prompts = prompts.prompts
+            except Exception as e:
+                pass
+            save_tools_cache(self.server_param, tools.tools, self._prompts)
             for tool in tools.tools:
                 self._tools.append(create_langchain_tool(tool, self._session, self))
         except Exception as e:
