@@ -1,10 +1,11 @@
-from typing import List, Type, Optional
+from typing import List, Type, Optional, Any, override
 from pydantic import BaseModel
 from langchain_core.tools import BaseTool, BaseToolkit, ToolException
-from jsonschema_pydantic import jsonschema_to_pydantic
 from mcp import StdioServerParameters, types, ClientSession
 from mcp.client.stdio import stdio_client
 import pydantic
+from pydantic_core import core_schema as cs
+from pydantic.json_schema import JsonSchemaValue
 
 from .storage import *
 
@@ -122,16 +123,42 @@ def create_langchain_tool(
             if result.isError:
                 raise ToolException(result.content)
             return result.content
-    
-    return McpTool(
-        name=tool_schema.name,
-        description=tool_schema.description,
-        args_schema=jsonschema_to_pydantic(tool_schema.inputSchema),
-        session=session,
-        toolkit=toolkit,
-        toolkit_name=toolkit.name,
-    )
 
+        @override
+        @property
+        def tool_call_schema(self) -> type[pydantic.BaseModel]:
+            assert self.args_schema is not None  # noqa: S101
+            return self.args_schema
+    
+    try:
+        return McpTool(
+            name=tool_schema.name,
+            description=tool_schema.description,
+            # args_schema=jsonschema_to_pydantic(tool_schema.inputSchema),
+            session=session,
+            toolkit=toolkit,
+            toolkit_name=toolkit.name,
+            args_schema=create_schema_model(tool_schema.inputSchema),
+        )
+    except Exception as e:
+        print(f"Error creating tool {tool_schema.name}: {e}")
+        print("Tool schema: ", tool_schema.inputSchema)
+        raise e
+
+def create_schema_model(schema: dict[str, Any]) -> type[pydantic.BaseModel]:
+    # Create a new model class that returns our JSON schema.
+    # LangChain requires a BaseModel class.
+    class Schema(pydantic.BaseModel):
+        model_config = pydantic.ConfigDict(extra="allow")
+
+        @override
+        @classmethod
+        def __get_pydantic_json_schema__(
+            cls, core_schema: cs.CoreSchema, handler: pydantic.GetJsonSchemaHandler
+        ) -> JsonSchemaValue:
+            return schema
+
+    return Schema
 
 async def convert_mcp_to_langchain_tools(server_config: McpServerConfig, force_refresh: bool = False) -> McpToolkit:
     """Convert MCP tools to LangChain tools and create a toolkit.
