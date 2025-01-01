@@ -38,16 +38,24 @@ class ReActAgent:
             ("system", system_prompt),
             ("placeholder", "{messages}")
         ])
-        self.model = model.bind_tools(tools)
+        if tools:
+            self.model = model.bind_tools(tools)
+            self.tools_by_name = {tool.name: tool for tool in tools}
+        else:
+            self.model = model
+            self.tools_by_name = {}
         self.chain = self.prompt | self.model
         self.tools = tools
-        self.tools_by_name = {tool.name: tool for tool in tools}
         self.checkpointer = checkpointer
         self.store = store
         self.create_graph()
 
     async def astream(self, input: AgentState, thread_id: str):
-        async for chunk in self.graph.astream(input, stream_mode=["messages", "values"], config={"configurable": {"thread_id": thread_id}}):
+        async for chunk in self.graph.astream(
+                input, 
+                stream_mode=["messages", "values"], 
+                config={"configurable": {"thread_id": thread_id}, "recursion_limit": 100},
+            ):
             yield chunk
 
     def create_graph(self):
