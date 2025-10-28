@@ -1,35 +1,34 @@
 from typing import List, Type, Optional, Any, override
 from pydantic import BaseModel
 from langchain_core.tools import BaseTool, BaseToolkit, ToolException
-from mcp import StdioServerParameters, types, ClientSession
-from mcp.client.stdio import stdio_client
+from mcp import types, ClientSession
 import pydantic
 from pydantic_core import to_json
 from jsonschema_pydantic import jsonschema_to_pydantic
 import asyncio
 
 from .storage import *
+from .transport import ServerParameters, create_transport
 
 class McpServerConfig(BaseModel):
     """Configuration for an MCP server.
-    
+
     This class represents the configuration needed to connect to and identify an MCP server,
     containing both the server's name and its connection parameters.
 
     Attributes:
         server_name (str): The name identifier for this MCP server
-        server_param (StdioServerParameters): Connection parameters for the server, including
-            command, arguments and environment variables
+        server_param (ServerParameters): Connection parameters for the server (STDIO or SSE)
         exclude_tools (list[str]): List of tool names to exclude from this server
     """
-    
+
     server_name: str
-    server_param: StdioServerParameters
+    server_param: ServerParameters
     exclude_tools: list[str] = []
 
 class McpToolkit(BaseToolkit):
     name: str
-    server_param: StdioServerParameters
+    server_param: ServerParameters
     exclude_tools: list[str] = []
     _session: Optional[ClientSession] = None
     _tools: List[BaseTool] = []
@@ -47,7 +46,7 @@ class McpToolkit(BaseToolkit):
             if self._session:
                 return self._session
 
-            self._client = stdio_client(self.server_param)
+            self._client = create_transport(self.server_param)
             read, write = await self._client.__aenter__()
             self._session = ClientSession(read, write)
             await self._session.__aenter__()
@@ -75,7 +74,7 @@ class McpToolkit(BaseToolkit):
                     continue
                 self._tools.append(create_langchain_tool(tool, self._session, self))
         except Exception as e:
-            print(f"Error gathering tools for {self.server_param.command} {' '.join(self.server_param.args)}: {e}")
+            print(f"Error gathering tools for {self.name}: {e}")
             raise e
         
     async def close(self):

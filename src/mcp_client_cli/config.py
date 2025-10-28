@@ -7,6 +7,8 @@ import commentjson
 from typing import Dict, List, Optional
 
 from .const import CONFIG_FILE, CONFIG_DIR
+from .transport import ServerParameters, SseServerParameters
+from mcp import StdioServerParameters
 
 @dataclass
 class LLMConfig:
@@ -31,24 +33,57 @@ class LLMConfig:
 @dataclass
 class ServerConfig:
     """Configuration for an MCP server."""
-    command: str
-    args: List[str] = None
-    env: Dict[str, str] = None
+    # STDIO transport fields
+    command: Optional[str] = None
+    args: Optional[List[str]] = None
+    env: Optional[Dict[str, str]] = None
+
+    # SSE transport fields
+    url: Optional[str] = None
+    headers: Optional[Dict[str, str]] = None
+    timeout: float = 5.0
+    sse_read_timeout: float = 300.0
+
+    # Common fields
     enabled: bool = True
-    exclude_tools: List[str] = None
-    requires_confirmation: List[str] = None
+    exclude_tools: Optional[List[str]] = None
+    requires_confirmation: Optional[List[str]] = None
 
     @classmethod
     def from_dict(cls, config: dict) -> "ServerConfig":
         """Create ServerConfig from dictionary."""
         return cls(
-            command=config["command"],
+            command=config.get("command"),
             args=config.get("args", []),
             env=config.get("env", {}),
+            url=config.get("url"),
+            headers=config.get("headers"),
+            timeout=config.get("timeout", 5.0),
+            sse_read_timeout=config.get("sse_read_timeout", 300.0),
             enabled=config.get("enabled", True),
             exclude_tools=config.get("exclude_tools", []),
             requires_confirmation=config.get("requires_confirmation", [])
         )
+
+    def to_transport_params(self) -> ServerParameters:
+        """Convert config to transport parameters."""
+        if self.url:
+            # SSE transport
+            return SseServerParameters(
+                url=self.url,
+                headers=self.headers,
+                timeout=self.timeout,
+                sse_read_timeout=self.sse_read_timeout
+            )
+        elif self.command:
+            # STDIO transport
+            return StdioServerParameters(
+                command=self.command,
+                args=self.args or [],
+                env=self.env or {}
+            )
+        else:
+            raise ValueError("Server config must specify either 'command' (STDIO) or 'url' (SSE)")
 
 @dataclass
 class AppConfig:

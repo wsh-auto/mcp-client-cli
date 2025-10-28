@@ -1,47 +1,70 @@
 from datetime import datetime, timedelta
 from typing import Optional, List
-from mcp import StdioServerParameters, types
+from mcp import types
 import json
 import aiosqlite
 import uuid
+import hashlib
+from urllib.parse import urlparse
 
 from .const import *
+from .transport import ServerParameters, SseServerParameters
+from mcp import StdioServerParameters
 
-def get_cached_tools(server_param: StdioServerParameters) -> Optional[List[types.Tool]]:
-    """Retrieve cached tools if available and not expired.
-    
+def _generate_cache_key(server_param: ServerParameters) -> str:
+    """Generate a cache key from server parameters.
+
     Args:
-        server_param (StdioServerParameters): The server parameters to identify the cache.
-    
+        server_param (ServerParameters): The server parameters (STDIO or SSE).
+
+    Returns:
+        str: A cache key suitable for use as a filename.
+    """
+    if isinstance(server_param, SseServerParameters):
+        # For SSE servers, use URL-based key
+        parsed = urlparse(server_param.url)
+        # Create a hash to avoid filesystem issues with long URLs
+        url_hash = hashlib.sha256(server_param.url.encode()).hexdigest()[:16]
+        return f"sse-{parsed.hostname or 'unknown'}-{url_hash}"
+    else:
+        # For STDIO servers, use command-based key (original behavior)
+        return f"{server_param.command}-{'-'.join(server_param.args)}".replace("/", "-")
+
+def get_cached_tools(server_param: ServerParameters) -> Optional[List[types.Tool]]:
+    """Retrieve cached tools if available and not expired.
+
+    Args:
+        server_param (ServerParameters): The server parameters to identify the cache.
+
     Returns:
         Optional[List[types.Tool]]: A list of tools if cache is available and not expired, otherwise None.
     """
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    cache_key = f"{server_param.command}-{'-'.join(server_param.args)}".replace("/", "-")
+    cache_key = _generate_cache_key(server_param)
     cache_file = CACHE_DIR / f"{cache_key}.json"
-    
+
     if not cache_file.exists():
         return None
-        
+
     cache_data = json.loads(cache_file.read_text())
     cached_time = datetime.fromisoformat(cache_data["cached_at"])
-    
+
     if datetime.now() - cached_time > timedelta(hours=CACHE_EXPIRY_HOURS):
         return None
-            
+
     return [types.Tool(**tool) for tool in cache_data["tools"]]
 
 
-def save_tools_cache(server_param: StdioServerParameters, tools: List[types.Tool]) -> None:
+def save_tools_cache(server_param: ServerParameters, tools: List[types.Tool]) -> None:
     """Save tools to cache.
-    
+
     Args:
-        server_param (StdioServerParameters): The server parameters to identify the cache.
+        server_param (ServerParameters): The server parameters to identify the cache.
         tools (List[types.Tool]): The list of tools to be cached.
     """
-    cache_key = f"{server_param.command}-{'-'.join(server_param.args)}".replace("/", "-")
+    cache_key = _generate_cache_key(server_param)
     cache_file = CACHE_DIR / f"{cache_key}.json"
-    
+
     cache_data = {
         "cached_at": datetime.now().isoformat(),
         "tools": [tool.model_dump() for tool in tools]

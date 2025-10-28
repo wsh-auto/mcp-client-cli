@@ -114,11 +114,7 @@ async def handle_list_tools(app_config: AppConfig, args: argparse.Namespace) -> 
     server_configs = [
         McpServerConfig(
             server_name=name,
-            server_param=StdioServerParameters(
-                command=config.command,
-                args=config.args or [],
-                env={**(config.env or {}), **os.environ}
-            ),
+            server_param=config.to_transport_params(),
             exclude_tools=config.exclude_tools or []
         )
         for name, config in app_config.get_enabled_servers().items()
@@ -183,17 +179,13 @@ async def load_tools(server_configs: list[McpServerConfig], no_tools: bool, forc
     langchain_tools.append(save_memory)
     return toolkits, langchain_tools
 
-async def handle_conversation(args: argparse.Namespace, query: HumanMessage, 
+async def handle_conversation(args: argparse.Namespace, query: HumanMessage,
                             is_conversation_continuation: bool, app_config: AppConfig) -> None:
     """Handle the main conversation flow."""
     server_configs = [
         McpServerConfig(
             server_name=name,
-            server_param=StdioServerParameters(
-                command=config.command,
-                args=config.args or [],
-                env={**(config.env or {}), **os.environ}
-            ),
+            server_param=config.to_transport_params(),
             exclude_tools=config.exclude_tools or []
         )
         for name, config in app_config.get_enabled_servers().items()
