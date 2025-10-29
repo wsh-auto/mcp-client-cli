@@ -94,13 +94,23 @@ class AppConfig:
     tools_requires_confirmation: List[str]
 
     @classmethod
-    def load(cls) -> "AppConfig":
+    def load(cls, config_path: Optional[str] = None) -> "AppConfig":
         """Load configuration from file."""
-        config_paths = [CONFIG_FILE, CONFIG_DIR / "config.json"]
-        chosen_path = next((path for path in config_paths if os.path.exists(path)), None)
-        
-        if chosen_path is None:
-            raise FileNotFoundError(f"Could not find config file in any of: {', '.join(map(str, config_paths))}")
+        if config_path:
+            # Use explicitly provided config path
+            chosen_path = Path(config_path)
+            if not chosen_path.exists():
+                raise FileNotFoundError(f"Config file not found: {config_path}")
+        else:
+            # Use default config paths
+            config_paths = [CONFIG_FILE, CONFIG_DIR / "config.json"]
+            chosen_path = next((path for path in config_paths if os.path.exists(path)), None)
+
+            if chosen_path is None:
+                raise FileNotFoundError(f"Could not find config file in any of: {', '.join(map(str, config_paths))}")
+
+        # Print which config file is being used
+        print(f"Using config: {chosen_path}", file=__import__('sys').stderr)
 
         with open(chosen_path, 'r') as f:
             config = commentjson.load(f)

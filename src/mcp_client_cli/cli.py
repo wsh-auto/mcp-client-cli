@@ -52,7 +52,7 @@ async def run() -> None:
     """Run the LLM agent."""
     args = setup_argument_parser()
     query, is_conversation_continuation = parse_query(args)
-    app_config = AppConfig.load()
+    app_config = AppConfig.load(args.config)
     
     if args.list_tools:
         await handle_list_tools(app_config, args)
@@ -107,6 +107,8 @@ Examples:
                        help='Show user memories')
     parser.add_argument('--model',
                        help='Override the model specified in config')
+    parser.add_argument('--config',
+                       help='Path to config file (default: ~/.llm/config.json)')
     return parser.parse_args()
 
 async def handle_list_tools(app_config: AppConfig, args: argparse.Namespace) -> None:
