@@ -73,9 +73,53 @@ async def run() -> None:
 
 def setup_argument_parser() -> argparse.Namespace:
     """Setup and return the argument parser."""
+
+    # Custom help action to show config info
+    class ConfigHelpAction(argparse.Action):
+        def __call__(self, parser, namespace, values, option_string=None):
+            # Show config information first
+            from pathlib import Path
+            import commentjson
+
+            config_path = namespace.config if hasattr(namespace, 'config') and namespace.config else None
+            config_paths = [
+                Path(config_path) if config_path else None,
+                Path.home() / '.llm' / 'config.json',
+                Path(__file__).parent.parent / 'config.json',
+            ]
+            config_paths = [p for p in config_paths if p]
+
+            chosen_path = None
+            for path in config_paths:
+                if path and path.exists():
+                    chosen_path = path
+                    break
+
+            print("\n" + "="*80)
+            print("CONFIGURATION")
+            print("="*80)
+            if chosen_path:
+                print(f"\nConfig file: {chosen_path}\n")
+                try:
+                    with open(chosen_path, 'r') as f:
+                        config_content = f.read()
+                    print(config_content)
+                except Exception as e:
+                    print(f"Error reading config: {e}")
+            else:
+                print(f"\nNo config file found. Searched:")
+                for path in config_paths:
+                    print(f"  - {path}")
+            print("\n" + "="*80 + "\n")
+
+            # Show regular help
+            parser.print_help()
+            parser.exit()
+
     parser = argparse.ArgumentParser(
         description='Run LangChain agent with MCP tools',
         formatter_class=argparse.RawDescriptionHelpFormatter,
+        add_help=False,  # Disable default help to add custom one
         epilog="""
 Examples:
   llm "What is the capital of France?"     Ask a simple question
@@ -87,6 +131,8 @@ Examples:
   llm --no-confirmations "search web"      Run tools without confirmation
         """
     )
+    parser.add_argument('-h', '--help', action=ConfigHelpAction, nargs=0,
+                       help='Show this help message and config file location')
     parser.add_argument('query', nargs='*', default=[],
                        help='The query to process (default: read from stdin). '
                             'Special prefixes:\n'
