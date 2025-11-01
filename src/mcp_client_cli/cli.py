@@ -4,6 +4,9 @@
 Simple llm CLI that acts as MCP client.
 """
 
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
 from datetime import datetime
 import argparse
 import asyncio
@@ -226,8 +229,8 @@ async def handle_conversation(args: argparse.Namespace, query: HumanMessage,
         memories = await get_memories(store)
         formatted_memories = "\n".join(f"- {memory}" for memory in memories)
         agent_executor = create_react_agent(
-            model, tools, state_schema=AgentState, 
-            state_modifier=prompt, checkpointer=checkpointer, store=store
+            model, tools, state_schema=AgentState,
+            prompt=prompt, checkpointer=checkpointer, store=store
         )
         
         thread_id = (await conversation_manager.get_last_id() if is_conversation_continuation 

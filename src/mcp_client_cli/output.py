@@ -75,7 +75,7 @@ class OutputHandler:
         self.stop()
         to_print = self.last_message if self.only_last_message else Markdown(self.md)
         if not self.text_only and not self.only_last_message:
-            self.console.clear()
+            # Don't clear screen - just print the final output
             self.console.print(Markdown(self.md))
         if self.only_last_message:
             self.console.print(to_print)
