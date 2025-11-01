@@ -109,8 +109,7 @@ class AppConfig:
             if chosen_path is None:
                 raise FileNotFoundError(f"Could not find config file in any of: {', '.join(map(str, config_paths))}")
 
-        # Print which config file is being used
-        print(f"Using config: {chosen_path}", file=__import__('sys').stderr)
+        # Config path is available via chosen_path if needed for debugging
 
         with open(chosen_path, 'r') as f:
             config = commentjson.load(f)

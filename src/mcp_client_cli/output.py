@@ -73,11 +73,10 @@ class OutputHandler:
 
     def finish(self):
         self.stop()
-        to_print = self.last_message if self.only_last_message else Markdown(self.md)
-        if not self.text_only and not self.only_last_message:
-            # Don't clear screen - just print the final output
-            self.console.print(Markdown(self.md))
+        # When using Live display with screen=False, content is already on screen
+        # Only print when using text_only or only_last_message modes
         if self.only_last_message:
+            to_print = self.last_message if self.text_only else Markdown(self.last_message)
             self.console.print(to_print)
 
     def _parse_chunk(self, chunk: any, md: str = "") -> str:
