@@ -20,9 +20,9 @@ class OutputHandler:
     def start(self):
         if not self.text_only:
             self._live = Live(
-                Markdown(self.md), 
-                vertical_overflow="visible", 
-                screen=True,
+                Markdown(self.md),
+                vertical_overflow="visible",
+                screen=False,  # Don't use alternate screen to preserve terminal history
                 console=self.console
             )
             self._live.start()
