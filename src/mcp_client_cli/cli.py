@@ -54,21 +54,31 @@ class AgentState(TypedDict):
 async def run() -> None:
     """Run the LLM agent."""
     args = setup_argument_parser()
+
+    # If no arguments provided, show help
+    if len(sys.argv) == 1:
+        setup_argument_parser_for_help().print_help()
+        return
+
     query, is_conversation_continuation = parse_query(args)
     app_config = AppConfig.load(args.config)
-    
+
     if args.list_tools:
         await handle_list_tools(app_config, args)
         return
-    
+
+    if args.list_models:
+        handle_list_models(app_config)
+        return
+
     if args.show_memories:
         await handle_show_memories()
         return
-        
+
     if args.list_prompts:
         handle_list_prompts()
         return
-        
+
     await handle_conversation(args, query, is_conversation_continuation, app_config)
 
 def setup_argument_parser() -> argparse.Namespace:
@@ -127,6 +137,7 @@ Examples:
   llm p review                             Use a prompt template
   cat file.txt | llm                       Process input from a file
   llm --list-tools                         Show available tools
+  llm --list-models                        Show configured model
   llm --list-prompts                       Show available prompt templates
   llm --no-confirmations "search web"      Run tools without confirmation
         """
@@ -140,6 +151,8 @@ Examples:
                             '  p: Use prompt template')
     parser.add_argument('--list-tools', action='store_true',
                        help='List all available LLM tools')
+    parser.add_argument('--list-models', action='store_true',
+                       help='List configured LLM model information')
     parser.add_argument('--list-prompts', action='store_true',
                        help='List all available prompts')
     parser.add_argument('--no-confirmations', action='store_true',
@@ -159,6 +172,75 @@ Examples:
     parser.add_argument('--config',
                        help='Path to config file (default: ~/.llm/config.json)')
     return parser.parse_args()
+
+def setup_argument_parser_for_help() -> argparse.ArgumentParser:
+    """Return just the parser for help display without parsing args."""
+    # Re-create parser with same structure but don't parse
+    parser = argparse.ArgumentParser(
+        description='Run LangChain agent with MCP tools',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  llm "What is the capital of France?"     Ask a simple question
+  llm c "tell me more"                     Continue previous conversation
+  llm p review                             Use a prompt template
+  cat file.txt | llm                       Process input from a file
+  llm --list-tools                         Show available tools
+  llm --list-models                        Show configured model
+  llm --list-prompts                       Show available prompt templates
+  llm --no-confirmations "search web"      Run tools without confirmation
+        """
+    )
+    parser.add_argument('query', nargs='*', default=[],
+                       help='The query to process (default: read from stdin). '
+                            'Special prefixes:\n'
+                            '  c: Continue previous conversation\n'
+                            '  p: Use prompt template')
+    parser.add_argument('--list-tools', action='store_true',
+                       help='List all available LLM tools')
+    parser.add_argument('--list-models', action='store_true',
+                       help='List configured LLM model information')
+    parser.add_argument('--list-prompts', action='store_true',
+                       help='List all available prompts')
+    parser.add_argument('--no-confirmations', action='store_true',
+                       help='Bypass tool confirmation requirements')
+    parser.add_argument('--force-refresh', action='store_true',
+                       help='Force refresh of tools capabilities')
+    parser.add_argument('--text-only', action='store_true',
+                       help='Print output as raw text instead of parsing markdown')
+    parser.add_argument('--no-tools', action='store_true',
+                       help='Do not add any tools')
+    parser.add_argument('--no-intermediates', action='store_true',
+                       help='Only print the final message')
+    parser.add_argument('--show-memories', action='store_true',
+                       help='Show user memories')
+    parser.add_argument('--model',
+                       help='Override the model specified in config')
+    parser.add_argument('--config',
+                       help='Path to config file (default: ~/.llm/config.json)')
+    return parser
+
+def handle_list_models(app_config: AppConfig) -> None:
+    """Handle the --list-models command."""
+    console = Console()
+
+    print("\n" + "="*80)
+    print("CONFIGURED MODEL")
+    print("="*80 + "\n")
+
+    llm_config = app_config.llm
+
+    table = Table(title="LLM Configuration")
+    table.add_column("Property", style="cyan", no_wrap=True)
+    table.add_column("Value", style="green")
+
+    table.add_row("Provider", llm_config.provider or "Not specified")
+    table.add_row("Model", llm_config.model or "Not specified")
+    table.add_row("Base URL", llm_config.base_url or "Default")
+    table.add_row("API Key", "***" + (llm_config.api_key[-8:] if llm_config.api_key and len(llm_config.api_key) > 8 else "Set") if llm_config.api_key else "Not set")
+
+    console.print(table)
+    print()
 
 async def handle_list_tools(app_config: AppConfig, args: argparse.Namespace) -> None:
     """Handle the --list-tools command."""
