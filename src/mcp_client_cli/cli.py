@@ -108,11 +108,10 @@ def setup_argument_parser() -> argparse.Namespace:
                     chosen_path = path
                     break
 
-            print("\n" + "="*80)
-            print("CONFIGURATION")
+            print("\nCONFIGURATION")
             print("="*80)
             if chosen_path:
-                print(f"\nConfig file: {chosen_path}\n")
+                print(f"Config file: {chosen_path}\n")
                 try:
                     with open(chosen_path, 'r') as f:
                         config_content = f.read()
@@ -120,10 +119,9 @@ def setup_argument_parser() -> argparse.Namespace:
                 except Exception as e:
                     print(f"Error reading config: {e}")
             else:
-                print(f"\nNo config file found. Searched:")
+                print(f"No config file found. Searched:")
                 for path in config_paths:
                     print(f"  - {path}")
-            print("\n" + "="*80 + "\n")
 
             parser.exit()
 
