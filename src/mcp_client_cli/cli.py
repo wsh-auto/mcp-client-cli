@@ -79,10 +79,6 @@ async def run() -> None:
         handle_list_prompts()
         return
 
-    if args.no_mcp:
-        print("MCP servers and model query skipped (--no-mcp)")
-        return
-
     await handle_conversation(args, query, is_conversation_continuation, app_config)
 
 def setup_argument_parser() -> argparse.Namespace:
@@ -182,7 +178,7 @@ Examples:
     parser.add_argument('--no-tools', action='store_true',
                        help='Do not add any tools')
     parser.add_argument('--no-mcp', action='store_true',
-                       help='Skip loading MCP servers and querying the model (useful for validation)')
+                       help='Do not load MCP servers (runs conversation without tools)')
     parser.add_argument('--no-intermediates', action='store_true',
                        help='Only print the final message')
     parser.add_argument('--show-memories', action='store_true',
@@ -231,7 +227,7 @@ Examples:
     parser.add_argument('--no-tools', action='store_true',
                        help='Do not add any tools')
     parser.add_argument('--no-mcp', action='store_true',
-                       help='Skip loading MCP servers and querying the model (useful for validation)')
+                       help='Do not load MCP servers (runs conversation without tools)')
     parser.add_argument('--no-intermediates', action='store_true',
                        help='Only print the final message')
     parser.add_argument('--show-memories', action='store_true',
@@ -274,8 +270,8 @@ async def handle_list_tools(app_config: AppConfig, args: argparse.Namespace) -> 
         )
         for name, config in app_config.get_enabled_servers().items()
     ]
-    toolkits, tools = await load_tools(server_configs, args.no_tools, args.force_refresh)
-    
+    toolkits, tools = await load_tools(server_configs, args.no_tools, args.no_mcp, args.force_refresh)
+
     console = Console()
     table = Table(title="Available LLM Tools")
     table.add_column("Toolkit", style="cyan")
@@ -314,9 +310,9 @@ def handle_list_prompts() -> None:
         
     console.print(table)
 
-async def load_tools(server_configs: list[McpServerConfig], no_tools: bool, force_refresh: bool) -> tuple[list, list]:
+async def load_tools(server_configs: list[McpServerConfig], no_tools: bool, no_mcp: bool, force_refresh: bool) -> tuple[list, list]:
     """Load and convert MCP tools to LangChain tools."""
-    if no_tools:
+    if no_tools or no_mcp:
         return [], []
         
     toolkits = []
@@ -345,8 +341,8 @@ async def handle_conversation(args: argparse.Namespace, query: HumanMessage,
         )
         for name, config in app_config.get_enabled_servers().items()
     ]
-    toolkits, tools = await load_tools(server_configs, args.no_tools, args.force_refresh)
-    
+    toolkits, tools = await load_tools(server_configs, args.no_tools, args.no_mcp, args.force_refresh)
+
     extra_body = {}
     if app_config.llm.base_url and "openrouter" in app_config.llm.base_url:
         extra_body = {"transforms": ["middle-out"]}
