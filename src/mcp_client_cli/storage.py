@@ -8,24 +8,25 @@ import hashlib
 from urllib.parse import urlparse
 
 from .const import *
-from .transport import ServerParameters, SseServerParameters
+from .transport import ServerParameters, SseServerParameters, StreamableHttpServerParameters
 from mcp import StdioServerParameters
 
 def _generate_cache_key(server_param: ServerParameters) -> str:
     """Generate a cache key from server parameters.
 
     Args:
-        server_param (ServerParameters): The server parameters (STDIO or SSE).
+        server_param (ServerParameters): The server parameters (STDIO, SSE, or Streamable HTTP).
 
     Returns:
         str: A cache key suitable for use as a filename.
     """
-    if isinstance(server_param, SseServerParameters):
-        # For SSE servers, use URL-based key
+    if isinstance(server_param, (SseServerParameters, StreamableHttpServerParameters)):
+        # For HTTP-based transports, use URL-based key
         parsed = urlparse(server_param.url)
         # Create a hash to avoid filesystem issues with long URLs
         url_hash = hashlib.sha256(server_param.url.encode()).hexdigest()[:16]
-        return f"sse-{parsed.hostname or 'unknown'}-{url_hash}"
+        transport_type = "streamable-http" if isinstance(server_param, StreamableHttpServerParameters) else "sse"
+        return f"{transport_type}-{parsed.hostname or 'unknown'}-{url_hash}"
     else:
         # For STDIO servers, use command-based key (original behavior)
         return f"{server_param.command}-{'-'.join(server_param.args)}".replace("/", "-")

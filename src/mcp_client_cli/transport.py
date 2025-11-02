@@ -16,8 +16,17 @@ class SseServerParameters:
     sse_read_timeout: float = 300.0
 
 
+@dataclass
+class StreamableHttpServerParameters:
+    """Parameters for connecting to a Streamable HTTP MCP server."""
+    url: str
+    headers: Optional[dict[str, str]] = None
+    timeout: float = 30.0
+    sse_read_timeout: float = 300.0
+
+
 # Union type for all supported server parameter types
-ServerParameters = Union[StdioServerParameters, SseServerParameters]
+ServerParameters = Union[StdioServerParameters, SseServerParameters, StreamableHttpServerParameters]
 
 
 @asynccontextmanager
@@ -25,11 +34,11 @@ async def create_transport(params: ServerParameters):
     """
     Create a transport connection to an MCP server.
 
-    Supports both STDIO (child process) and SSE (HTTP) transports.
+    Supports STDIO (child process), SSE (HTTP), and Streamable HTTP transports.
     Returns (read_stream, write_stream) tuple for use with ClientSession.
 
     Args:
-        params: Either StdioServerParameters or SseServerParameters
+        params: Either StdioServerParameters, SseServerParameters, or StreamableHttpServerParameters
 
     Yields:
         tuple: (read_stream, write_stream) for MCP communication
@@ -48,6 +57,16 @@ async def create_transport(params: ServerParameters):
             timeout=params.timeout,
             sse_read_timeout=params.sse_read_timeout
         ) as (read, write):
+            yield read, write
+    elif isinstance(params, StreamableHttpServerParameters):
+        # Streamable HTTP transport - POST with SSE responses
+        from mcp.client.streamable_http import streamablehttp_client
+        async with streamablehttp_client(
+            params.url,
+            headers=params.headers,
+            timeout=params.timeout,
+            sse_read_timeout=params.sse_read_timeout
+        ) as (read, write, get_session_id):
             yield read, write
     else:
         raise ValueError(f"Unsupported server parameter type: {type(params)}")

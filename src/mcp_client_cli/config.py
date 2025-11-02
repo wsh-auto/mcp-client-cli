@@ -7,7 +7,7 @@ import commentjson
 from typing import Dict, List, Optional
 
 from .const import CONFIG_FILE, CONFIG_DIR
-from .transport import ServerParameters, SseServerParameters
+from .transport import ServerParameters, SseServerParameters, StreamableHttpServerParameters
 from mcp import StdioServerParameters
 
 @dataclass
@@ -38,8 +38,9 @@ class ServerConfig:
     args: Optional[List[str]] = None
     env: Optional[Dict[str, str]] = None
 
-    # SSE transport fields
+    # HTTP-based transport fields (SSE and Streamable HTTP)
     url: Optional[str] = None
+    transport: Optional[str] = None  # "sse", "streamable_http", or auto-detect from URL
     headers: Optional[Dict[str, str]] = None
     timeout: float = 5.0
     sse_read_timeout: float = 300.0
@@ -57,8 +58,9 @@ class ServerConfig:
             args=config.get("args", []),
             env=config.get("env", {}),
             url=config.get("url"),
+            transport=config.get("transport"),
             headers=config.get("headers"),
-            timeout=config.get("timeout", 5.0),
+            timeout=config.get("timeout", 5.0 if config.get("transport") == "sse" else 30.0),
             sse_read_timeout=config.get("sse_read_timeout", 300.0),
             enabled=config.get("enabled", True),
             exclude_tools=config.get("exclude_tools", []),
@@ -68,13 +70,27 @@ class ServerConfig:
     def to_transport_params(self) -> ServerParameters:
         """Convert config to transport parameters."""
         if self.url:
-            # SSE transport
-            return SseServerParameters(
-                url=self.url,
-                headers=self.headers,
-                timeout=self.timeout,
-                sse_read_timeout=self.sse_read_timeout
-            )
+            # Determine transport type
+            transport_type = self.transport or "sse"  # Default to SSE for backward compatibility
+
+            if transport_type == "streamable_http":
+                # Streamable HTTP transport
+                return StreamableHttpServerParameters(
+                    url=self.url,
+                    headers=self.headers,
+                    timeout=self.timeout,
+                    sse_read_timeout=self.sse_read_timeout
+                )
+            elif transport_type == "sse":
+                # SSE transport
+                return SseServerParameters(
+                    url=self.url,
+                    headers=self.headers,
+                    timeout=self.timeout,
+                    sse_read_timeout=self.sse_read_timeout
+                )
+            else:
+                raise ValueError(f"Unknown transport type: {transport_type}. Use 'sse' or 'streamable_http'")
         elif self.command:
             # STDIO transport
             return StdioServerParameters(
@@ -83,7 +99,7 @@ class ServerConfig:
                 env=self.env or {}
             )
         else:
-            raise ValueError("Server config must specify either 'command' (STDIO) or 'url' (SSE)")
+            raise ValueError("Server config must specify either 'command' (STDIO) or 'url' (HTTP-based transport)")
 
 @dataclass
 class AppConfig:
