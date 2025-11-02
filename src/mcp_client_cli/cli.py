@@ -108,14 +108,26 @@ def setup_argument_parser() -> argparse.Namespace:
                     chosen_path = path
                     break
 
+            # ANSI codes for bright white (bold white)
+            BRIGHT_WHITE = '\033[1;97m'
+            RESET = '\033[0m'
+
             if chosen_path:
-                print(f"\nConfig file: {chosen_path}\n")
+                print(f"\nConfig file: {BRIGHT_WHITE}{chosen_path}{RESET}\n")
                 try:
                     with open(chosen_path, 'r') as f:
                         config_content = f.read()
                     print(config_content)
                 except Exception as e:
                     print(f"Error reading config: {e}")
+
+                # Show other possible config locations
+                other_paths = [p for p in config_paths if p != chosen_path]
+                if other_paths:
+                    print(f"\nOther possible config locations:")
+                    for path in other_paths:
+                        exists = " (exists)" if path.exists() else ""
+                        print(f"  - {path}{exists}")
             else:
                 print(f"\nNo config file found. Searched:")
                 for path in config_paths:
