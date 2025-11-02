@@ -87,10 +87,13 @@ def setup_argument_parser() -> argparse.Namespace:
     # Custom help action to show config info
     class ConfigHelpAction(argparse.Action):
         def __call__(self, parser, namespace, values, option_string=None):
-            # Show config information first
             from pathlib import Path
             import commentjson
 
+            # Show regular help first
+            parser.print_help()
+
+            # Then show config information at bottom
             config_path = namespace.config if hasattr(namespace, 'config') and namespace.config else None
             config_paths = [
                 Path(config_path) if config_path else None,
@@ -122,8 +125,6 @@ def setup_argument_parser() -> argparse.Namespace:
                     print(f"  - {path}")
             print("\n" + "="*80 + "\n")
 
-            # Show regular help
-            parser.print_help()
             parser.exit()
 
     parser = argparse.ArgumentParser(
