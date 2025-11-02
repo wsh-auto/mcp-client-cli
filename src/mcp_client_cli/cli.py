@@ -97,6 +97,15 @@ def setup_argument_parser() -> argparse.Namespace:
             # Show regular help first
             parser.print_help()
 
+            # ANSI codes for bright white (bold white)
+            BRIGHT_WHITE = '\033[1;97m'
+            RESET = '\033[0m'
+
+            def format_path(path):
+                """Format path with ~/ and bold."""
+                path_str = str(path).replace(str(Path.home()), '~')
+                return f"{BRIGHT_WHITE}{path_str}{RESET}"
+
             # Then show config information at bottom
             config_path = namespace.config if hasattr(namespace, 'config') and namespace.config else None
             config_paths = [
@@ -112,12 +121,8 @@ def setup_argument_parser() -> argparse.Namespace:
                     chosen_path = path
                     break
 
-            # ANSI codes for bright white (bold white)
-            BRIGHT_WHITE = '\033[1;97m'
-            RESET = '\033[0m'
-
             if chosen_path:
-                print(f"\nConfig file: {BRIGHT_WHITE}{chosen_path}{RESET}\n")
+                print(f"\nConfig file: {format_path(chosen_path)}\n")
                 try:
                     with open(chosen_path, 'r') as f:
                         config_content = f.read()
@@ -131,11 +136,11 @@ def setup_argument_parser() -> argparse.Namespace:
                     print(f"\nOther possible config locations:")
                     for path in other_paths:
                         exists = " (exists)" if path.exists() else ""
-                        print(f"  - {path}{exists}")
+                        print(f"  - {format_path(path)}{exists}")
             else:
                 print(f"\nNo config file found. Searched:")
                 for path in config_paths:
-                    print(f"  - {path}")
+                    print(f"  - {format_path(path)}")
 
             parser.exit()
 
