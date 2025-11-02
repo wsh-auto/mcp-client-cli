@@ -79,6 +79,10 @@ async def run() -> None:
         handle_list_prompts()
         return
 
+    if args.no_mcp:
+        print("MCP servers and model query skipped (--no-mcp)")
+        return
+
     await handle_conversation(args, query, is_conversation_continuation, app_config)
 
 def setup_argument_parser() -> argparse.Namespace:
@@ -172,6 +176,8 @@ Examples:
                        help='Print output as raw text instead of parsing markdown')
     parser.add_argument('--no-tools', action='store_true',
                        help='Do not add any tools')
+    parser.add_argument('--no-mcp', action='store_true',
+                       help='Skip loading MCP servers and querying the model (useful for validation)')
     parser.add_argument('--no-intermediates', action='store_true',
                        help='Only print the final message')
     parser.add_argument('--show-memories', action='store_true',
@@ -219,6 +225,8 @@ Examples:
                        help='Print output as raw text instead of parsing markdown')
     parser.add_argument('--no-tools', action='store_true',
                        help='Do not add any tools')
+    parser.add_argument('--no-mcp', action='store_true',
+                       help='Skip loading MCP servers and querying the model (useful for validation)')
     parser.add_argument('--no-intermediates', action='store_true',
                        help='Only print the final message')
     parser.add_argument('--show-memories', action='store_true',
@@ -340,19 +348,23 @@ async def handle_conversation(args: argparse.Namespace, query: HumanMessage,
     # Override model if specified in command line
     if args.model:
         app_config.llm.model = args.model
-        
-    model: BaseChatModel = init_chat_model(
-        model=app_config.llm.model,
-        model_provider=app_config.llm.provider,
-        api_key=app_config.llm.api_key,
-        temperature=app_config.llm.temperature,
-        base_url=app_config.llm.base_url,
-        default_headers={
+
+    # Build init_chat_model kwargs, only include provider if specified
+    init_kwargs = {
+        "model": app_config.llm.model,
+        "api_key": app_config.llm.api_key,
+        "temperature": app_config.llm.temperature,
+        "base_url": app_config.llm.base_url,
+        "default_headers": {
             "X-Title": "mcp-client-cli",
             "HTTP-Referer": "https://github.com/adhikasp/mcp-client-cli",
         },
-        extra_body=extra_body
-    )
+        "extra_body": extra_body
+    }
+    if app_config.llm.provider:
+        init_kwargs["model_provider"] = app_config.llm.provider
+
+    model: BaseChatModel = init_chat_model(**init_kwargs)
 
     prompt = ChatPromptTemplate.from_messages([
         ("system", app_config.system_prompt),

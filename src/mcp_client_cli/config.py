@@ -12,9 +12,14 @@ from mcp import StdioServerParameters
 
 @dataclass
 class LLMConfig:
-    """Configuration for the LLM model."""
+    """Configuration for the LLM model.
+
+    Note: When using OpenAI-compatible proxies like LiteLLM, set provider="openai"
+    even if the model string references other providers (e.g., "anthropic/claude-haiku-4.5").
+    The provider indicates the API format, not the actual model provider.
+    """
     model: str = "gpt-4o"
-    provider: str = "openai"
+    provider: Optional[str] = None
     api_key: Optional[str] = None
     temperature: float = 0
     base_url: Optional[str] = None
@@ -24,7 +29,7 @@ class LLMConfig:
         """Create LLMConfig from dictionary."""
         return cls(
             model=config.get("model", cls.model),
-            provider=config.get("provider", cls.provider),
+            provider=config.get("provider"),
             api_key=config.get("api_key", os.getenv("LLM_API_KEY", os.getenv("OPENAI_API_KEY", ""))),
             temperature=config.get("temperature", cls.temperature),
             base_url=config.get("base_url"),
