@@ -244,16 +244,45 @@ def handle_list_models(app_config: AppConfig) -> None:
 
     llm_config = app_config.llm
 
-    table = Table(title="LLM Configuration")
-    table.add_column("Property", style="cyan", no_wrap=True)
-    table.add_column("Value", style="green")
+    config_table = Table(title="Current Configuration")
+    config_table.add_column("Property", style="cyan", no_wrap=True)
+    config_table.add_column("Value", style="green")
 
-    table.add_row("Provider", llm_config.provider or "Not specified")
-    table.add_row("Model", llm_config.model or "Not specified")
-    table.add_row("Base URL", llm_config.base_url or "Default")
-    table.add_row("API Key", "***" + (llm_config.api_key[-8:] if llm_config.api_key and len(llm_config.api_key) > 8 else "Set") if llm_config.api_key else "Not set")
+    config_table.add_row("Provider", llm_config.provider or "Not specified")
+    config_table.add_row("Model", llm_config.model or "Not specified")
+    config_table.add_row("Base URL", llm_config.base_url or "Default")
+    config_table.add_row("API Key", "***" + (llm_config.api_key[-8:] if llm_config.api_key and len(llm_config.api_key) > 8 else "Set") if llm_config.api_key else "Not set")
 
-    console.print(table)
+    console.print(config_table)
+    print()
+
+    # Show all available LiteLLM models
+    print("\n" + "="*80)
+    print("AVAILABLE LITELLM MODELS")
+    print("="*80 + "\n")
+
+    models_table = Table(title="LiteLLM Model Pricing")
+    models_table.add_column("Model", style="cyan", no_wrap=True)
+    models_table.add_column("Context", style="yellow", justify="right")
+    models_table.add_column("Input $/MTok", style="green", justify="right")
+    models_table.add_column("Output $/MTok", style="green", justify="right")
+    models_table.add_column("Notes", style="white")
+
+    # Model pricing from use-litellm skill
+    models = [
+        ("google/gemini-2.5-flash-lite", "1M", "$0.10", "$0.40", "Cheapest"),
+        ("google/gemini-2.5-flash", "1M", "$0.50", "$1.50", "Fast, cost-effective"),
+        ("anthropic/claude-haiku-4.5", "200K", "$1.00", "$5.00", "Good balance"),
+        ("openai/gpt-5", "128K", "$1.25", "$10.00", "Half the cost of GPT-4o"),
+        ("anthropic/claude-sonnet-4.5", "200K", "$3.00", "$15.00", "Most capable"),
+    ]
+
+    for model, context, input_price, output_price, notes in models:
+        models_table.add_row(model, context, input_price, output_price, notes)
+
+    console.print(models_table)
+    print("\nNote: Use provider=\"openai\" in config when using LiteLLM proxy")
+    print("      The model string (e.g., 'anthropic/claude-haiku-4.5') indicates the actual model")
     print()
 
 async def handle_list_tools(app_config: AppConfig, args: argparse.Namespace) -> None:
@@ -300,11 +329,41 @@ def handle_list_prompts() -> None:
     table.add_column("Name", style="cyan")
     table.add_column("Template")
     table.add_column("Arguments")
-    
+
     for name, template in prompt_templates.items():
         table.add_row(name, template, ", ".join(re.findall(r'\{(\w+)\}', template)))
-        
+
     console.print(table)
+
+def show_model_error_and_list() -> None:
+    """Show available models when there's a model error."""
+    console = Console()
+
+    print("\n" + "="*80)
+    print("MODEL ERROR - AVAILABLE MODELS")
+    print("="*80 + "\n")
+
+    models_table = Table(title="Available LiteLLM Models")
+    models_table.add_column("Model", style="cyan", no_wrap=True)
+    models_table.add_column("Context", style="yellow", justify="right")
+    models_table.add_column("Input $/MTok", style="green", justify="right")
+    models_table.add_column("Output $/MTok", style="green", justify="right")
+    models_table.add_column("Notes", style="white")
+
+    models = [
+        ("google/gemini-2.5-flash-lite", "1M", "$0.10", "$0.40", "Cheapest"),
+        ("google/gemini-2.5-flash", "1M", "$0.50", "$1.50", "Fast, cost-effective"),
+        ("anthropic/claude-haiku-4.5", "200K", "$1.00", "$5.00", "Good balance"),
+        ("openai/gpt-5", "128K", "$1.25", "$10.00", "Half the cost of GPT-4o"),
+        ("anthropic/claude-sonnet-4.5", "200K", "$3.00", "$15.00", "Most capable"),
+    ]
+
+    for model, context, input_price, output_price, notes in models:
+        models_table.add_row(model, context, input_price, output_price, notes)
+
+    console.print(models_table)
+    print("\nTip: Use 'llm --list-models' to see configured model and available options")
+    print()
 
 async def load_tools(server_configs: list[McpServerConfig], no_tools: bool, force_refresh: bool) -> tuple[list, list]:
     """Load and convert MCP tools to LangChain tools."""
@@ -361,7 +420,16 @@ async def handle_conversation(args: argparse.Namespace, query: HumanMessage,
     if app_config.llm.provider:
         init_kwargs["model_provider"] = app_config.llm.provider
 
-    model: BaseChatModel = init_chat_model(**init_kwargs)
+    # Try to initialize the model, catch errors and show helpful message
+    try:
+        model: BaseChatModel = init_chat_model(**init_kwargs)
+    except Exception as e:
+        print(f"\n❌ Error initializing model '{app_config.llm.model}':")
+        print(f"   {str(e)}\n")
+        show_model_error_and_list()
+        for toolkit in toolkits:
+            await toolkit.close()
+        return
 
     prompt = ChatPromptTemplate.from_messages([
         ("system", app_config.system_prompt),
@@ -395,7 +463,7 @@ async def handle_conversation(args: argparse.Namespace, query: HumanMessage,
             async for chunk in agent_executor.astream(
                 input_messages,
                 stream_mode=["messages", "values"],
-                config={"configurable": {"thread_id": thread_id, "user_id": "myself"}, 
+                config={"configurable": {"thread_id": thread_id, "user_id": "myself"},
                        "recursion_limit": 100}
             ):
                 output.update(chunk)
@@ -403,7 +471,15 @@ async def handle_conversation(args: argparse.Namespace, query: HumanMessage,
                     if not output.confirm_tool_call(app_config.__dict__, chunk):
                         break
         except Exception as e:
-            output.update_error(e)
+            # Check if this is a model-related error
+            error_str = str(e).lower()
+            if "invalid model" in error_str or "model not found" in error_str or "model=" in error_str:
+                output.finish()
+                print(f"\n❌ Invalid model '{app_config.llm.model}':")
+                print(f"   {str(e)}\n")
+                show_model_error_and_list()
+            else:
+                output.update_error(e)
         finally:
             output.finish()
 
