@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-Simple llm CLI that acts as MCP client.
+Simple lll CLI that acts as MCP client.
 """
 
 import warnings
@@ -106,7 +106,7 @@ def setup_argument_parser() -> argparse.Namespace:
             config_path = namespace.config if hasattr(namespace, 'config') and namespace.config else None
             config_paths = [
                 Path(config_path) if config_path else None,
-                Path.home() / '.llm' / 'config.json',
+                Path.home() / '.lll' / 'config.json',
                 Path(__file__).parent.parent / 'config.json',
             ]
             config_paths = [p for p in config_paths if p]
@@ -141,19 +141,20 @@ def setup_argument_parser() -> argparse.Namespace:
             parser.exit()
 
     parser = argparse.ArgumentParser(
+        prog='lll',
         description='Run LangChain agent with MCP tools',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         add_help=False,  # Disable default help to add custom one
         epilog="""
 Examples:
-  llm "What is the capital of France?"     Ask a simple question
-  llm c "tell me more"                     Continue previous conversation
-  llm p review                             Use a prompt template
-  cat file.txt | llm                       Process input from a file
-  llm --list-tools                         Show available tools
-  llm --list-models                        Show configured model
-  llm --list-prompts                       Show available prompt templates
-  llm --no-confirmations "search web"      Run tools without confirmation
+  lll "What is the capital of France?"     Ask a simple question
+  lll c "tell me more"                     Continue previous conversation
+  lll p review                             Use a prompt template
+  cat file.txt | lll                       Process input from a file
+  lll --list-tools                         Show available tools
+  lll --list-models                        Show configured model
+  lll --list-prompts                       Show available prompt templates
+  lll --no-confirmations "search web"      Run tools without confirmation
         """
     )
     parser.add_argument('-h', '--help', action=ConfigHelpAction, nargs=0,
@@ -184,25 +185,26 @@ Examples:
     parser.add_argument('--model',
                        help='Override the model specified in config')
     parser.add_argument('--config',
-                       help='Path to config file (default: ~/.llm/config.json)')
+                       help='Path to config file (default: ~/.lll/config.json)')
     return parser.parse_args()
 
 def setup_argument_parser_for_help() -> argparse.ArgumentParser:
     """Return just the parser for help display without parsing args."""
     # Re-create parser with same structure but don't parse
     parser = argparse.ArgumentParser(
+        prog='lll',
         description='Run LangChain agent with MCP tools',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  llm "What is the capital of France?"     Ask a simple question
-  llm c "tell me more"                     Continue previous conversation
-  llm p review                             Use a prompt template
-  cat file.txt | llm                       Process input from a file
-  llm --list-tools                         Show available tools
-  llm --list-models                        Show configured model
-  llm --list-prompts                       Show available prompt templates
-  llm --no-confirmations "search web"      Run tools without confirmation
+  lll "What is the capital of France?"     Ask a simple question
+  lll c "tell me more"                     Continue previous conversation
+  lll p review                             Use a prompt template
+  cat file.txt | lll                       Process input from a file
+  lll --list-tools                         Show available tools
+  lll --list-models                        Show configured model
+  lll --list-prompts                       Show available prompt templates
+  lll --no-confirmations "search web"      Run tools without confirmation
         """
     )
     parser.add_argument('query', nargs='*', default=[],
@@ -231,7 +233,7 @@ Examples:
     parser.add_argument('--model',
                        help='Override the model specified in config')
     parser.add_argument('--config',
-                       help='Path to config file (default: ~/.llm/config.json)')
+                       help='Path to config file (default: ~/.lll/config.json)')
     return parser
 
 def handle_list_models(app_config: AppConfig) -> None:
@@ -362,7 +364,7 @@ def show_model_error_and_list() -> None:
         models_table.add_row(model, context, input_price, output_price, notes)
 
     console.print(models_table)
-    print("\nTip: Use 'llm --list-models' to see configured model and available options")
+    print("\nTip: Use 'lll --list-models' to see configured model and available options")
     print()
 
 async def load_tools(server_configs: list[McpServerConfig], no_tools: bool, force_refresh: bool) -> tuple[list, list]:

@@ -10,12 +10,12 @@ Person(user, "User", "Software engineer using the CLI")
 
 note right of user
     Common Usage:
-    $ llm "What is the capital of France?"
-    $ llm c "tell me more"
-    $ llm p review
-    $ cat file.txt | llm
-    $ llm --list-tools
-    $ llm --list-prompts
+    $ lll "What is the capital of France?"
+    $ lll c "tell me more"
+    $ lll p review
+    $ cat file.txt | lll
+    $ lll --list-tools
+    $ lll --list-prompts
 end note
 
 System_Boundary(mcp_client_cli, "MCP Client CLI") {
@@ -33,7 +33,7 @@ System_Boundary(mcp_client_cli, "MCP Client CLI") {
 }
 
 System_Ext(mcp_servers, "MCP Servers", "External MCP-compatible servers providing various tools")
-System_Ext(llm_providers, "LLM Providers", "External LLM services (OpenAI, Google, etc.)")
+System_Ext(lll_providers, "LLL Providers", "External LLM services (OpenAI, Google, etc.)")
 
 Rel(user, cli_component, "Uses", "CLI commands")
 Rel(cli_component, config_manager, "Uses", "Loads configuration")
@@ -47,6 +47,6 @@ Rel(memory_manager, sqlite_db, "Reads/Writes", "SQL")
 Rel(config_manager, config_file, "Reads", "JSON")
 
 Rel(tool_manager, mcp_servers, "Connects", "MCP Protocol")
-Rel(cli_component, llm_providers, "Uses", "API calls")
+Rel(cli_component, lll_providers, "Uses", "API calls")
 
 @enduml 

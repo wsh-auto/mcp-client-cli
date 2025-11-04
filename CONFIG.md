@@ -5,7 +5,7 @@ This document describes the configuration format for the MCP Client CLI. The con
 ## Configuration File Location
 
 The configuration file can be placed in either:
-- `~/.llm/config.json` (user's home directory)
+- `~/.lll/config.json` (user's home directory)
 - `mcp-server-config.json` (in the current working directory)
 
 ## Configuration Structure
@@ -13,7 +13,7 @@ The configuration file can be placed in either:
 ```json
 {
   "systemPrompt": "string",
-  "llm": {
+  "lll": {
     "provider": "string",
     "model": "string",
     "api_key": "string",
@@ -42,7 +42,7 @@ The configuration file can be placed in either:
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `systemPrompt` | string | Yes | System prompt for the LLM |
-| `llm` | object | No | LLM configuration |
+| `lll` | object | No | LLM configuration |
 | `mcpServers` | object | Yes | Dictionary of MCP server configurations |
 
 ### LLM Configuration
@@ -56,7 +56,7 @@ The configuration file can be placed in either:
 | `base_url` | string | No | `null` | Custom API endpoint URL |
 
 **Notes:**
-- The `api_key` can be omitted if it's set via environment variables `LLM_API_KEY` or `OPENAI_API_KEY`
+- The `api_key` can be omitted if it's set via environment variables `LLL_API_KEY` or `OPENAI_API_KEY`
 
 ### MCP Server Configuration
 
@@ -74,7 +74,7 @@ The configuration file can be placed in either:
 ```json
 {
   "systemPrompt": "You are an AI assistant helping a software engineer...",
-  "llm": {
+  "lll": {
     "provider": "openai",
     "model": "gpt-4o-mini",
     "api_key": "your-api-key-here",
@@ -112,12 +112,12 @@ The configuration file supports comments with `//` syntax:
 {
   "systemPrompt": "You are an AI assistant helping a software engineer...",
   // Uncomment this section to use Anthropic Claude
-  // "llm": {
+  // "lll": {
   //   "provider": "anthropic",
   //   "model": "claude-3-opus-20240229",
   //   "api_key": "your-anthropic-api-key"
   // },
-  "llm": {
+  "lll": {
     "provider": "openai",
     "model": "gpt-4o",
     "api_key": "your-openai-api-key"

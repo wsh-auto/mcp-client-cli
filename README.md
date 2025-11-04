@@ -15,7 +15,7 @@ This act as alternative client beside Claude Desktop. Additionally you can use a
    pip install mcp-client-cli
    ```
 
-2. Create a `~/.llm/config.json` file to configure your LLM and MCP servers:
+2. Create a `~/.lll/config.json` file to configure your LLM and MCP servers:
    ```json
    {
      "systemPrompt": "You are an AI assistant helping a software engineer...",
@@ -54,12 +54,12 @@ This act as alternative client beside Claude Desktop. Additionally you can use a
    - See [CONFIG.md](CONFIG.md) for complete documentation of the configuration format
    - Use `requires_confirmation` to specify which tools need user confirmation before execution
    - The LLM API key can also be set via environment variables `LLM_API_KEY` or `OPENAI_API_KEY`
-   - The config file can be placed in either `~/.llm/config.json` or `$PWD/.llm/config.json`
+   - The config file can be placed in either `~/.lll/config.json` or `$PWD/.lll/config.json`
    - You can comment the JSON config file with `//` if you like to switch around the configuration
 
 3. Run the CLI:
    ```bash
-   llm "What is the capital city of North Sumatra?"
+   lll "What is the capital city of North Sumatra?"
    ```
 
 ## Usage
@@ -67,7 +67,7 @@ This act as alternative client beside Claude Desktop. Additionally you can use a
 ### Basic Usage
 
 ```bash
-$ llm What is the capital city of North Sumatra?
+$ lll What is the capital city of North Sumatra?
 The capital city of North Sumatra is Medan.
 ```
 
@@ -76,11 +76,11 @@ You can omit the quotes, but be careful with bash special characters like `&`, `
 You can also pipe input from other commands or files:
 
 ```bash
-$ echo "What is the capital city of North Sumatra?" | llm
+$ echo "What is the capital city of North Sumatra?" | lll
 The capital city of North Sumatra is Medan.
 
 $ echo "Given a location, tell me its capital city." > instructions.txt
-$ cat instruction.txt | llm "West Java"
+$ cat instruction.txt | lll "West Java"
 The capital city of West Java is Bandung.
 ```
 
@@ -89,10 +89,10 @@ The capital city of West Java is Bandung.
 You can pipe image files to analyze them with multimodal LLMs:
 
 ```bash
-$ cat image.jpg | llm "What do you see in this image?"
+$ cat image.jpg | lll "What do you see in this image?"
 [LLM will analyze and describe the image]
 
-$ cat screenshot.png | llm "Is there any error in this screenshot?"
+$ cat screenshot.png | lll "Is there any error in this screenshot?"
 [LLM will analyze the screenshot and point out any errors]
 ```
 
@@ -102,18 +102,18 @@ You can use predefined prompt templates by using the `p` prefix followed by the 
 
 ```bash
 # List available prompt templates
-$ llm --list-prompts
+$ lll --list-prompts
 
 # Use a template
-$ llm p review  # Review git changes
-$ llm p commit  # Generate commit message
-$ llm p yt url=https://youtube.com/...  # Summarize YouTube video
+$ lll p review  # Review git changes
+$ lll p commit  # Generate commit message
+$ lll p yt url=https://youtube.com/...  # Summarize YouTube video
 ```
 
 ### Triggering a tool
 
 ```bash
-$ llm What is the top article on hackernews today?
+$ lll What is the top article on hackernews today?
 
 ================================== Ai Message ==================================
 Tool Calls:
@@ -152,12 +152,12 @@ You can view the full list of articles on [Hacker News](https://news.ycombinator
 To bypass tool confirmation requirements, use the `--no-confirmations` flag:
 
 ```bash
-$ llm --no-confirmations "What is the top article on hackernews today?"
+$ lll --no-confirmations "What is the top article on hackernews today?"
 ```
 
 To use in bash scripts, add the --no-intermediates, so it doesn't print intermediate messages, only the concluding end message.
 ```bash
-$ llm --no-intermediates "What is the time in Tokyo right now?"
+$ lll --no-intermediates "What is the time in Tokyo right now?"
 ```
 
 ### Continuation
@@ -165,9 +165,9 @@ $ llm --no-intermediates "What is the time in Tokyo right now?"
 Add a `c ` prefix to your message to continue the last conversation.
 
 ```bash
-$ llm asldkfjasdfkl
+$ lll asldkfjasdfkl
 It seems like your message might have been a typo or an error. Could you please clarify or provide more details about what you need help with?
-$ llm c what did i say previously?
+$ lll c what did i say previously?
 You previously typed "asldkfjasdfkl," which appears to be a random string of characters. If you meant to ask something specific or if you have a question, please let me know!
 ```
 
@@ -177,18 +177,18 @@ You can use content from your clipboard using the `cb` command:
 
 ```bash
 # After copying text to clipboard
-$ llm cb
+$ lll cb
 [LLM will process the clipboard text]
 
-$ llm cb "What language is this code written in?"
+$ lll cb "What language is this code written in?"
 [LLM will analyze the clipboard text with your question]
 
 # After copying an image to clipboard
-$ llm cb "What do you see in this image?"
+$ lll cb "What do you see in this image?"
 [LLM will analyze the clipboard image]
 
 # You can combine it with continuation
-$ llm cb c "Tell me more about what you see"
+$ lll cb c "Tell me more about what you see"
 [LLM will continue the conversation about the clipboard content]
 ```
 
@@ -215,13 +215,13 @@ The CLI automatically detects if the clipboard content is text or image and hand
 ### Additional Options
 
 ```bash
-$ llm --list-tools                # List all available tools
-$ llm --list-prompts              # List available prompt templates
-$ llm --no-tools                  # Run without any tools
-$ llm --force-refresh             # Force refresh tool capabilities cache
-$ llm --text-only                 # Output raw text without markdown formatting
-$ llm --show-memories             # Show user memories
-$ llm --model gpt-4               # Override the model specified in config
+$ lll --list-tools                # List all available tools
+$ lll --list-prompts              # List available prompt templates
+$ lll --no-tools                  # Run without any tools
+$ lll --force-refresh             # Force refresh tool capabilities cache
+$ lll --text-only                 # Output raw text without markdown formatting
+$ lll --show-memories             # Show user memories
+$ lll --model gpt-4               # Override the model specified in config
 ```
 
 ## Contributing

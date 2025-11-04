@@ -46,4 +46,4 @@ Homepage = "https://github.com/adhikasp/mcp_client_cli"
 Issues = "https://github.com/adhikasp/mcp_client_cli/issues"
 
 [project.scripts]
-llm = "mcp_client_cli.cli:main"
+lll = "mcp_client_cli.cli:main"
