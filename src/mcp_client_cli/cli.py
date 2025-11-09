@@ -146,10 +146,6 @@ def handle_list_models(app_config: AppConfig) -> None:
     """Handle the --list-models command."""
     console = Console()
 
-    print("\n" + "="*80)
-    print("CONFIGURED MODEL")
-    print("="*80 + "\n")
-
     llm_config = app_config.llm
 
     config_table = Table(title="Current Configuration")
@@ -165,10 +161,6 @@ def handle_list_models(app_config: AppConfig) -> None:
     print()
 
     # Show all available LiteLLM models
-    print("\n" + "="*80)
-    print("AVAILABLE LITELLM MODELS")
-    print("="*80 + "\n")
-
     models_table = Table(title="LiteLLM Model Performance")
     models_table.add_column("Model", style="cyan", no_wrap=True)
     models_table.add_column("Context", style="yellow", justify="right")
@@ -251,10 +243,6 @@ def handle_list_prompts() -> None:
 def show_model_error_and_list() -> None:
     """Show available models when there's a model error."""
     console = Console()
-
-    print("\n" + "="*80)
-    print("MODEL ERROR - AVAILABLE MODELS")
-    print("="*80 + "\n")
 
     models_table = Table(title="Available LiteLLM Models")
     models_table.add_column("Model", style="cyan", no_wrap=True)
