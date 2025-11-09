@@ -57,30 +57,14 @@ class AgentState(TypedDict):
 
 async def run(total_start_time: float) -> None:
     """Run the LLM agent."""
+    args = setup_argument_parser()
+
     # If no arguments provided, show help
     if len(sys.argv) == 1:
-        parser = argparse.ArgumentParser(
-            prog='lll',
-            description='Run LangChain agent with MCP tools',
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            epilog="""
-Examples:
-  lll "What is the capital of France?"     Ask a simple question
-  lll c "tell me more"                     Continue previous conversation
-  lll p review                             Use a prompt template
-  cat file.txt | lll                       Process input from a file
-  lll --list-tools                         Show available tools
-  lll --list-models                        Show configured model
-  lll --list-prompts                       Show available prompt templates
-  lll --no-confirmations "search web"      Run tools without confirmation
-
-AGENTS: MUST load skill://mdr:test-mcp-server before editing or for context
-        """
-        )
+        # Create parser just to print help (without parsing)
+        parser = create_parser()
         parser.print_help()
         return
-
-    args = setup_argument_parser()
 
     query, is_conversation_continuation = parse_query(args)
     app_config = AppConfig.load(args.config)
@@ -103,8 +87,8 @@ AGENTS: MUST load skill://mdr:test-mcp-server before editing or for context
 
     await handle_conversation(args, query, is_conversation_continuation, app_config, total_start_time)
 
-def setup_argument_parser() -> argparse.Namespace:
-    """Setup and return the argument parser."""
+def create_parser() -> argparse.ArgumentParser:
+    """Create and return the argument parser without parsing."""
     parser = argparse.ArgumentParser(
         prog='lll',
         description='Run LangChain agent with MCP tools',
@@ -140,60 +124,8 @@ AGENTS: MUST load skill://mdr:test-mcp-server before editing or for context
                        help='Force refresh of tools capabilities')
     parser.add_argument('--text-only', action='store_true',
                        help='Print output as raw text instead of parsing markdown')
-    parser.add_argument('--no-tools', action='store_true',
-                       help='Do not add any tools')
-    parser.add_argument('--no-intermediates', action='store_true',
-                       help='Only print the final message')
-    parser.add_argument('--show-memories', action='store_true',
-                       help='Show user memories')
-    parser.add_argument('--model',
-                       help='Override the model specified in config')
-    parser.add_argument('--config',
-                       help='Path to config file (default: ~/.lll/config.json)')
-    parser.add_argument('--debug', action='store_true',
-                       help='Show debug information including server logs and timing')
-    return parser.parse_args()
-
-def setup_argument_parser_for_help() -> argparse.ArgumentParser:
-    """Return just the parser for help display without parsing args."""
-    # Re-create parser with same structure but don't parse
-    parser = argparse.ArgumentParser(
-        prog='lll',
-        description='Run LangChain agent with MCP tools',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  lll "What is the capital of France?"     Ask a simple question
-  lll c "tell me more"                     Continue previous conversation
-  lll p review                             Use a prompt template
-  cat file.txt | lll                       Process input from a file
-  lll --list-tools                         Show available tools
-  lll --list-models                        Show configured model
-  lll --list-prompts                       Show available prompt templates
-  lll --no-confirmations "search web"      Run tools without confirmation
-
-AGENTS: MUST load skill://mdr:test-mcp-server before editing or for context
-        """
-    )
-    parser.add_argument('query', nargs='*', default=[],
-                       help='The query to process (default: read from stdin). '
-                            'Special prefixes:\n'
-                            '  c: Continue previous conversation\n'
-                            '  p: Use prompt template')
-    parser.add_argument('--list-tools', action='store_true',
-                       help='List all available LLM tools')
-    parser.add_argument('--list-models', action='store_true',
-                       help='List configured LLM model information')
-    parser.add_argument('--list-prompts', action='store_true',
-                       help='List all available prompts')
-    parser.add_argument('--no-confirmations', action='store_true',
-                       help='Bypass tool confirmation requirements')
-    parser.add_argument('--force-refresh', action='store_true',
-                       help='Force refresh of tools capabilities')
-    parser.add_argument('--text-only', action='store_true',
-                       help='Print output as raw text instead of parsing markdown')
-    parser.add_argument('--no-tools', action='store_true',
-                       help='Do not add any tools')
+    parser.add_argument('--mcp', action='store_true',
+                       help='Enable MCP tools (slower startup, more capable)')
     parser.add_argument('--no-intermediates', action='store_true',
                        help='Only print the final message')
     parser.add_argument('--show-memories', action='store_true',
@@ -205,6 +137,10 @@ AGENTS: MUST load skill://mdr:test-mcp-server before editing or for context
     parser.add_argument('--debug', action='store_true',
                        help='Show debug information including server logs and timing')
     return parser
+
+def setup_argument_parser() -> argparse.Namespace:
+    """Setup and parse arguments."""
+    return create_parser().parse_args()
 
 def handle_list_models(app_config: AppConfig) -> None:
     """Handle the --list-models command."""
@@ -272,7 +208,7 @@ async def handle_list_tools(app_config: AppConfig, args: argparse.Namespace) -> 
         )
         for name, config in app_config.get_enabled_servers().items()
     ]
-    toolkits, tools = await load_tools(server_configs, args.no_tools, args.force_refresh, args.debug)
+    toolkits, tools = await load_tools(server_configs, args.mcp, args.force_refresh, args.debug)
 
     console = Console()
     table = Table(title="Available LLM Tools")
@@ -348,9 +284,9 @@ def show_model_error_and_list() -> None:
     print("\nTip: Use 'lll --list-models' to see configured model and available options")
     print()
 
-async def load_tools(server_configs: list[McpServerConfig], no_tools: bool, force_refresh: bool, debug: bool = False) -> tuple[list, list]:
+async def load_tools(server_configs: list[McpServerConfig], enable_mcp: bool, force_refresh: bool, debug: bool = False) -> tuple[list, list]:
     """Load and convert MCP tools to LangChain tools."""
-    if no_tools:
+    if not enable_mcp:
         return [], []
 
     toolkits = []
@@ -368,6 +304,70 @@ async def load_tools(server_configs: list[McpServerConfig], no_tools: bool, forc
     langchain_tools.append(save_memory)
     return toolkits, langchain_tools
 
+async def handle_simple_conversation(model, query: HumanMessage, app_config: AppConfig,
+                                   args: argparse.Namespace, total_start_time: float) -> None:
+    """Handle simple conversation without MCP tools (fast path)."""
+    # Track timing
+    start_time = time.time()
+    first_token_time = None
+    last_token_time = None
+
+    try:
+        # Simple streaming without agent infrastructure
+        messages = [
+            {"role": "system", "content": app_config.system_prompt},
+            {"role": "user", "content": query.content}
+        ]
+
+        async for chunk in model.astream(messages):
+            # Record first and last token times
+            if chunk.content:
+                if first_token_time is None:
+                    first_token_time = time.time()
+                last_token_time = time.time()
+
+            # Output the chunk (simple text output)
+            if chunk.content:
+                print(chunk.content, end="", flush=True)
+
+    except Exception as e:
+        # Check if this is a model-related error
+        error_str = str(e).lower()
+        if "invalid model" in error_str or "model not found" in error_str or "model=" in error_str:
+            print(f"\n❌ Invalid model '{app_config.llm.model}':")
+            print(f"   {str(e)}\n")
+            show_model_error_and_list()
+        else:
+            print(f"\n❌ Error: {str(e)}", file=sys.stderr)
+    finally:
+        print()  # Add newline after response
+
+        # Show timing information if we got a response
+        if first_token_time is not None:
+            ttft = first_token_time - start_time
+            total_time = time.time() - total_start_time
+
+            # Format model name (truncate if too long)
+            model_name = app_config.llm.model
+            if len(model_name) > 40:
+                model_name = model_name[:37] + "..."
+
+            # ANSI color codes for dimmed/gray text (debug styling)
+            GRAY = '\033[90m'
+            RESET = '\033[0m'
+
+            # Add newline before timing output
+            print(file=sys.stderr)
+            print(f"{GRAY}⏱️  [{model_name}] TTFT: {ttft:.2f}s", file=sys.stderr, end="")
+
+            if last_token_time is not None:
+                ttlt = last_token_time - start_time
+                print(f"  |  TTLT: {ttlt:.2f}s", file=sys.stderr, end="")
+
+            # Show total time including loading
+            print(f"  |  Total: {total_time:.2f}s", file=sys.stderr, end="")
+            print(RESET, file=sys.stderr)  # Reset color and new line at end
+
 async def handle_conversation(args: argparse.Namespace, query: HumanMessage,
                             is_conversation_continuation: bool, app_config: AppConfig,
                             total_start_time: float) -> None:
@@ -380,7 +380,7 @@ async def handle_conversation(args: argparse.Namespace, query: HumanMessage,
         )
         for name, config in app_config.get_enabled_servers().items()
     ]
-    toolkits, tools = await load_tools(server_configs, args.no_tools, args.force_refresh, args.debug)
+    toolkits, tools = await load_tools(server_configs, args.mcp, args.force_refresh, args.debug)
 
     extra_body = {}
     if app_config.llm.base_url and "openrouter" in app_config.llm.base_url:
@@ -411,6 +411,13 @@ async def handle_conversation(args: argparse.Namespace, query: HumanMessage,
         print(f"\n❌ Error initializing model '{app_config.llm.model}':")
         print(f"   {str(e)}\n")
         show_model_error_and_list()
+        for toolkit in toolkits:
+            await toolkit.close()
+        return
+
+    # Simple direct LLM path when MCP is disabled (much faster startup)
+    if not args.mcp:
+        await handle_simple_conversation(model, query, app_config, args, total_start_time)
         for toolkit in toolkits:
             await toolkit.close()
         return
