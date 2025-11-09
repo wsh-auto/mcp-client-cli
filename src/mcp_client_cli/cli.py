@@ -59,15 +59,15 @@ async def run(total_start_time: float) -> None:
     """Run the LLM agent."""
     args = setup_argument_parser()
 
-    # Handle --help or no arguments: show models + help
+    # Handle --help or no arguments: show help + models
     if args.help or len(sys.argv) == 1:
+        # Create parser to print help first
+        parser = create_parser()
+        parser.print_help()
+        print()  # Add spacing before tables
         # Load config to display model information
         app_config = AppConfig.load(args.config)
         handle_list_models(app_config)
-        print()  # Add spacing before help text
-        # Create parser to print help
-        parser = create_parser()
-        parser.print_help()
         return
 
     query, is_conversation_continuation = parse_query(args)
@@ -144,7 +144,7 @@ def handle_list_models(app_config: AppConfig) -> None:
 
     llm_config = app_config.llm
 
-    config_table = Table(title="Current Configuration")
+    config_table = Table()
     config_table.add_column("Property", style="cyan", no_wrap=True)
     config_table.add_column("Value", style="green")
 
@@ -157,7 +157,7 @@ def handle_list_models(app_config: AppConfig) -> None:
     print()
 
     # Show all available LiteLLM models
-    models_table = Table(title="LiteLLM Model Performance")
+    models_table = Table()
     models_table.add_column("Model", style="cyan", no_wrap=True)
     models_table.add_column("Context", style="yellow", justify="right")
     models_table.add_column("Input", style="green", justify="right")
@@ -182,9 +182,6 @@ def handle_list_models(app_config: AppConfig) -> None:
         models_table.add_row(model, context, input_price, output_price, throughput, ttft, ttlt)
 
     console.print(models_table)
-    print("\nNote: Use provider=\"openai\" in config when using LiteLLM proxy")
-    print("      The model string (e.g., 'anthropic/claude-haiku-4.5') indicates the actual model")
-    print()
 
 async def handle_list_tools(app_config: AppConfig, args: argparse.Namespace) -> None:
     """Handle the --list-tools command."""
