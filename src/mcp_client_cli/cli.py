@@ -16,6 +16,7 @@ import uuid
 import sys
 import re
 import anyio
+import time
 from langchain_core.messages import BaseMessage, HumanMessage
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -186,6 +187,8 @@ Examples:
                        help='Override the model specified in config')
     parser.add_argument('--config',
                        help='Path to config file (default: ~/.lll/config.json)')
+    parser.add_argument('--debug', action='store_true',
+                       help='Show debug information including server logs and timing')
     return parser.parse_args()
 
 def setup_argument_parser_for_help() -> argparse.ArgumentParser:
@@ -234,6 +237,8 @@ Examples:
                        help='Override the model specified in config')
     parser.add_argument('--config',
                        help='Path to config file (default: ~/.lll/config.json)')
+    parser.add_argument('--debug', action='store_true',
+                       help='Show debug information including server logs and timing')
     return parser
 
 def handle_list_models(app_config: AppConfig) -> None:
@@ -263,24 +268,28 @@ def handle_list_models(app_config: AppConfig) -> None:
     print("AVAILABLE LITELLM MODELS")
     print("="*80 + "\n")
 
-    models_table = Table(title="LiteLLM Model Pricing")
+    models_table = Table(title="LiteLLM Model Performance")
     models_table.add_column("Model", style="cyan", no_wrap=True)
     models_table.add_column("Context", style="yellow", justify="right")
-    models_table.add_column("Input $/MTok", style="green", justify="right")
-    models_table.add_column("Output $/MTok", style="green", justify="right")
-    models_table.add_column("Notes", style="white")
+    models_table.add_column("Input", style="green", justify="right")
+    models_table.add_column("Output", style="green", justify="right")
+    models_table.add_column("Throughput", style="magenta", justify="right")
+    models_table.add_column("TTFT", style="blue", justify="right")
 
-    # Model pricing from use-litellm skill
+    # Model pricing and performance from OpenRouter (Nov 2025)
+    # Sorted by TTFT (Time to First Token, lowest first)
     models = [
-        ("google/gemini-2.5-flash-lite", "1M", "$0.10", "$0.40", "Cheapest"),
-        ("google/gemini-2.5-flash", "1M", "$0.50", "$1.50", "Fast, cost-effective"),
-        ("anthropic/claude-haiku-4.5", "200K", "$1.00", "$5.00", "Good balance"),
-        ("openai/gpt-5", "128K", "$1.25", "$10.00", "Half the cost of GPT-4o"),
-        ("anthropic/claude-sonnet-4.5", "200K", "$3.00", "$15.00", "Most capable"),
+        ("google/gemini-2.5-flash-lite", "1M", "$0.10", "$0.40", "78 tok/s", "0.36s"),
+        ("google/gemini-2.5-flash", "1M", "$0.30", "$2.50", "94 tok/s", "0.47s"),
+        ("anthropic/claude-haiku-4.5", "200K", "$1.00", "$5.00", "138 tok/s", "0.51s"),
+        ("anthropic/claude-sonnet-4.5", "1M", "$3.00", "$15.00", "62 tok/s", "1.27s"),
+        ("x-ai/grok-4-fast", "2M", "$0.20", "$0.50", "140 tok/s", "3.72s"),
+        ("openai/gpt-5", "400K", "$1.25", "$10.00", "67 tok/s", "7.31s"),
+        ("x-ai/grok-4", "256K", "$3.00", "$15.00", "33 tok/s", "15.59s"),
     ]
 
-    for model, context, input_price, output_price, notes in models:
-        models_table.add_row(model, context, input_price, output_price, notes)
+    for model, context, input_price, output_price, throughput, latency in models:
+        models_table.add_row(model, context, input_price, output_price, throughput, latency)
 
     console.print(models_table)
     print("\nNote: Use provider=\"openai\" in config when using LiteLLM proxy")
@@ -297,7 +306,7 @@ async def handle_list_tools(app_config: AppConfig, args: argparse.Namespace) -> 
         )
         for name, config in app_config.get_enabled_servers().items()
     ]
-    toolkits, tools = await load_tools(server_configs, args.no_tools, args.force_refresh)
+    toolkits, tools = await load_tools(server_configs, args.no_tools, args.force_refresh, args.debug)
 
     console = Console()
     table = Table(title="Available LLM Tools")
@@ -348,42 +357,47 @@ def show_model_error_and_list() -> None:
     models_table = Table(title="Available LiteLLM Models")
     models_table.add_column("Model", style="cyan", no_wrap=True)
     models_table.add_column("Context", style="yellow", justify="right")
-    models_table.add_column("Input $/MTok", style="green", justify="right")
-    models_table.add_column("Output $/MTok", style="green", justify="right")
-    models_table.add_column("Notes", style="white")
+    models_table.add_column("Input", style="green", justify="right")
+    models_table.add_column("Output", style="green", justify="right")
+    models_table.add_column("Throughput", style="magenta", justify="right")
+    models_table.add_column("TTFT", style="blue", justify="right")
 
+    # Model pricing and performance from OpenRouter (Nov 2025)
+    # Sorted by TTFT (Time to First Token, lowest first)
     models = [
-        ("google/gemini-2.5-flash-lite", "1M", "$0.10", "$0.40", "Cheapest"),
-        ("google/gemini-2.5-flash", "1M", "$0.50", "$1.50", "Fast, cost-effective"),
-        ("anthropic/claude-haiku-4.5", "200K", "$1.00", "$5.00", "Good balance"),
-        ("openai/gpt-5", "128K", "$1.25", "$10.00", "Half the cost of GPT-4o"),
-        ("anthropic/claude-sonnet-4.5", "200K", "$3.00", "$15.00", "Most capable"),
+        ("google/gemini-2.5-flash-lite", "1M", "$0.10", "$0.40", "78 tok/s", "0.36s"),
+        ("google/gemini-2.5-flash", "1M", "$0.30", "$2.50", "94 tok/s", "0.47s"),
+        ("anthropic/claude-haiku-4.5", "200K", "$1.00", "$5.00", "138 tok/s", "0.51s"),
+        ("anthropic/claude-sonnet-4.5", "1M", "$3.00", "$15.00", "62 tok/s", "1.27s"),
+        ("x-ai/grok-4-fast", "2M", "$0.20", "$0.50", "140 tok/s", "3.72s"),
+        ("openai/gpt-5", "400K", "$1.25", "$10.00", "67 tok/s", "7.31s"),
+        ("x-ai/grok-4", "256K", "$3.00", "$15.00", "33 tok/s", "15.59s"),
     ]
 
-    for model, context, input_price, output_price, notes in models:
-        models_table.add_row(model, context, input_price, output_price, notes)
+    for model, context, input_price, output_price, throughput, latency in models:
+        models_table.add_row(model, context, input_price, output_price, throughput, latency)
 
     console.print(models_table)
     print("\nTip: Use 'lll --list-models' to see configured model and available options")
     print()
 
-async def load_tools(server_configs: list[McpServerConfig], no_tools: bool, force_refresh: bool) -> tuple[list, list]:
+async def load_tools(server_configs: list[McpServerConfig], no_tools: bool, force_refresh: bool, debug: bool = False) -> tuple[list, list]:
     """Load and convert MCP tools to LangChain tools."""
     if no_tools:
         return [], []
-        
+
     toolkits = []
     langchain_tools = []
-    
+
     async def convert_toolkit(server_config: McpServerConfig):
-        toolkit = await convert_mcp_to_langchain_tools(server_config, force_refresh)
+        toolkit = await convert_mcp_to_langchain_tools(server_config, force_refresh, debug)
         toolkits.append(toolkit)
         langchain_tools.extend(toolkit.get_tools())
 
     async with anyio.create_task_group() as tg:
         for server_param in server_configs:
             tg.start_soon(convert_toolkit, server_param)
-            
+
     langchain_tools.append(save_memory)
     return toolkits, langchain_tools
 
@@ -398,7 +412,7 @@ async def handle_conversation(args: argparse.Namespace, query: HumanMessage,
         )
         for name, config in app_config.get_enabled_servers().items()
     ]
-    toolkits, tools = await load_tools(server_configs, args.no_tools, args.force_refresh)
+    toolkits, tools = await load_tools(server_configs, args.no_tools, args.force_refresh, args.debug)
 
     extra_body = {}
     if app_config.llm.base_url and "openrouter" in app_config.llm.base_url:
@@ -461,6 +475,11 @@ async def handle_conversation(args: argparse.Namespace, query: HumanMessage,
 
         output = OutputHandler(text_only=args.text_only, only_last_message=args.no_intermediates)
         output.start()
+
+        # Track timing for TTFT (Time To First Token)
+        start_time = time.time()
+        first_token_time = None
+
         try:
             async for chunk in agent_executor.astream(
                 input_messages,
@@ -468,6 +487,14 @@ async def handle_conversation(args: argparse.Namespace, query: HumanMessage,
                 config={"configurable": {"thread_id": thread_id, "user_id": "myself"},
                        "recursion_limit": 100}
             ):
+                # Record first token time
+                if first_token_time is None:
+                    from langchain_core.messages import AIMessageChunk
+                    if isinstance(chunk, tuple) and chunk[0] == "messages":
+                        message_chunk = chunk[1][0] if len(chunk[1]) > 0 else None
+                        if isinstance(message_chunk, AIMessageChunk) and message_chunk.content:
+                            first_token_time = time.time()
+
                 output.update(chunk)
                 if not args.no_confirmations:
                     if not output.confirm_tool_call(app_config.__dict__, chunk):
@@ -484,6 +511,11 @@ async def handle_conversation(args: argparse.Namespace, query: HumanMessage,
                 output.update_error(e)
         finally:
             output.finish()
+
+            # Show timing information if we got a response
+            if first_token_time is not None:
+                ttft = first_token_time - start_time
+                print(f"\n⏱️  TTFT: {ttft:.2f}s", file=sys.stderr)
 
         await conversation_manager.save_id(thread_id, checkpointer.conn)
 

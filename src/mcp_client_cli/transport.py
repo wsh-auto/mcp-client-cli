@@ -30,7 +30,7 @@ ServerParameters = Union[StdioServerParameters, SseServerParameters, StreamableH
 
 
 @asynccontextmanager
-async def create_transport(params: ServerParameters):
+async def create_transport(params: ServerParameters, debug: bool = False):
     """
     Create a transport connection to an MCP server.
 
@@ -39,12 +39,24 @@ async def create_transport(params: ServerParameters):
 
     Args:
         params: Either StdioServerParameters, SseServerParameters, or StreamableHttpServerParameters
+        debug: If True, server will show debug logs. If False, server logs are suppressed.
 
     Yields:
         tuple: (read_stream, write_stream) for MCP communication
     """
     if isinstance(params, StdioServerParameters):
         # STDIO transport - spawn child process
+        # Set MCP_DEBUG environment variable to control server logging
+        if not debug:
+            # Add MCP_QUIET=1 to suppress server logs
+            import copy
+            params = copy.copy(params)
+            if params.env is None:
+                params.env = {}
+            else:
+                params.env = dict(params.env)  # Copy to avoid mutating original
+            params.env['MCP_QUIET'] = '1'
+
         from mcp.client.stdio import stdio_client
         async with stdio_client(params) as (read, write):
             yield read, write

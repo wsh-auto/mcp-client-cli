@@ -30,6 +30,7 @@ class McpToolkit(BaseToolkit):
     name: str
     server_param: ServerParameters
     exclude_tools: list[str] = []
+    debug: bool = False
     _session: Optional[ClientSession] = None
     _tools: List[BaseTool] = []
     _client = None
@@ -46,7 +47,7 @@ class McpToolkit(BaseToolkit):
             if self._session:
                 return self._session
 
-            self._client = create_transport(self.server_param)
+            self._client = create_transport(self.server_param, self.debug)
             read, write = await self._client.__aenter__()
             self._session = ClientSession(read, write)
             await self._session.__aenter__()
@@ -155,20 +156,22 @@ def create_langchain_tool(
     )
 
 
-async def convert_mcp_to_langchain_tools(server_config: McpServerConfig, force_refresh: bool = False) -> McpToolkit:
+async def convert_mcp_to_langchain_tools(server_config: McpServerConfig, force_refresh: bool = False, debug: bool = False) -> McpToolkit:
     """Convert MCP tools to LangChain tools and create a toolkit.
-    
+
     Args:
         server_config (McpServerConfig): Configuration for the MCP server including name and parameters.
         force_refresh (bool, optional): Whether to force refresh the tools cache. Defaults to False.
-    
+        debug (bool, optional): Whether to show debug information. Defaults to False.
+
     Returns:
         McpToolkit: A toolkit containing the converted LangChain tools.
     """
     toolkit = McpToolkit(
-        name=server_config.server_name, 
+        name=server_config.server_name,
         server_param=server_config.server_param,
-        exclude_tools=server_config.exclude_tools
+        exclude_tools=server_config.exclude_tools,
+        debug=debug
     )
     await toolkit.initialize(force_refresh=force_refresh)
     return toolkit
