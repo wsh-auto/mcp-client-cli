@@ -274,22 +274,23 @@ def handle_list_models(app_config: AppConfig) -> None:
     models_table.add_column("Input", style="green", justify="right")
     models_table.add_column("Output", style="green", justify="right")
     models_table.add_column("Throughput", style="magenta", justify="right")
-    models_table.add_column("TTFT", style="blue", justify="right")
+    models_table.add_column("TTFT", style="bright_cyan", justify="right")
+    models_table.add_column("TTLT", style="bright_blue", justify="right")
 
     # Model pricing and performance from OpenRouter (Nov 2025)
     # Sorted by TTFT (Time to First Token, lowest first)
     models = [
-        ("google/gemini-2.5-flash-lite", "1M", "$0.10", "$0.40", "78 tok/s", "0.36s"),
-        ("google/gemini-2.5-flash", "1M", "$0.30", "$2.50", "94 tok/s", "0.47s"),
-        ("anthropic/claude-haiku-4.5", "200K", "$1.00", "$5.00", "138 tok/s", "0.51s"),
-        ("anthropic/claude-sonnet-4.5", "1M", "$3.00", "$15.00", "62 tok/s", "1.27s"),
-        ("x-ai/grok-4-fast", "2M", "$0.20", "$0.50", "140 tok/s", "3.72s"),
-        ("openai/gpt-5", "400K", "$1.25", "$10.00", "67 tok/s", "7.31s"),
-        ("x-ai/grok-4", "256K", "$3.00", "$15.00", "33 tok/s", "15.59s"),
+        ("google/gemini-2.5-flash-lite", "1M", "$0.10", "$0.40", "78 tok/s", "0.36s", "0.76s"),
+        ("google/gemini-2.5-flash", "1M", "$0.30", "$2.50", "94 tok/s", "0.47s", "0.77s"),
+        ("anthropic/claude-haiku-4.5", "200K", "$1.00", "$5.00", "138 tok/s", "0.51s", "1.04s"),
+        ("anthropic/claude-sonnet-4.5", "1M", "$3.00", "$15.00", "62 tok/s", "1.27s", "1.29s"),
+        ("x-ai/grok-4-fast", "2M", "$0.20", "$0.50", "140 tok/s", "3.72s", "10.19s"),
+        ("openai/gpt-5", "400K", "$1.25", "$10.00", "67 tok/s", "7.31s", "7.82s"),
+        ("x-ai/grok-4", "256K", "$3.00", "$15.00", "33 tok/s", "15.59s", "45.09s"),
     ]
 
-    for model, context, input_price, output_price, throughput, latency in models:
-        models_table.add_row(model, context, input_price, output_price, throughput, latency)
+    for model, context, input_price, output_price, throughput, ttft, ttlt in models:
+        models_table.add_row(model, context, input_price, output_price, throughput, ttft, ttlt)
 
     console.print(models_table)
     print("\nNote: Use provider=\"openai\" in config when using LiteLLM proxy")
@@ -360,22 +361,23 @@ def show_model_error_and_list() -> None:
     models_table.add_column("Input", style="green", justify="right")
     models_table.add_column("Output", style="green", justify="right")
     models_table.add_column("Throughput", style="magenta", justify="right")
-    models_table.add_column("TTFT", style="blue", justify="right")
+    models_table.add_column("TTFT", style="bright_cyan", justify="right")
+    models_table.add_column("TTLT", style="bright_blue", justify="right")
 
     # Model pricing and performance from OpenRouter (Nov 2025)
     # Sorted by TTFT (Time to First Token, lowest first)
     models = [
-        ("google/gemini-2.5-flash-lite", "1M", "$0.10", "$0.40", "78 tok/s", "0.36s"),
-        ("google/gemini-2.5-flash", "1M", "$0.30", "$2.50", "94 tok/s", "0.47s"),
-        ("anthropic/claude-haiku-4.5", "200K", "$1.00", "$5.00", "138 tok/s", "0.51s"),
-        ("anthropic/claude-sonnet-4.5", "1M", "$3.00", "$15.00", "62 tok/s", "1.27s"),
-        ("x-ai/grok-4-fast", "2M", "$0.20", "$0.50", "140 tok/s", "3.72s"),
-        ("openai/gpt-5", "400K", "$1.25", "$10.00", "67 tok/s", "7.31s"),
-        ("x-ai/grok-4", "256K", "$3.00", "$15.00", "33 tok/s", "15.59s"),
+        ("google/gemini-2.5-flash-lite", "1M", "$0.10", "$0.40", "78 tok/s", "0.36s", "0.76s"),
+        ("google/gemini-2.5-flash", "1M", "$0.30", "$2.50", "94 tok/s", "0.47s", "0.77s"),
+        ("anthropic/claude-haiku-4.5", "200K", "$1.00", "$5.00", "138 tok/s", "0.51s", "1.04s"),
+        ("anthropic/claude-sonnet-4.5", "1M", "$3.00", "$15.00", "62 tok/s", "1.27s", "1.29s"),
+        ("x-ai/grok-4-fast", "2M", "$0.20", "$0.50", "140 tok/s", "3.72s", "10.19s"),
+        ("openai/gpt-5", "400K", "$1.25", "$10.00", "67 tok/s", "7.31s", "7.82s"),
+        ("x-ai/grok-4", "256K", "$3.00", "$15.00", "33 tok/s", "15.59s", "45.09s"),
     ]
 
-    for model, context, input_price, output_price, throughput, latency in models:
-        models_table.add_row(model, context, input_price, output_price, throughput, latency)
+    for model, context, input_price, output_price, throughput, ttft, ttlt in models:
+        models_table.add_row(model, context, input_price, output_price, throughput, ttft, ttlt)
 
     console.print(models_table)
     print("\nTip: Use 'lll --list-models' to see configured model and available options")
