@@ -10,7 +10,6 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 from datetime import datetime
 import argparse
 import asyncio
-import os
 from typing import Annotated, TypedDict
 import uuid
 import sys
@@ -156,6 +155,8 @@ Examples:
   lll --list-models                        Show configured model
   lll --list-prompts                       Show available prompt templates
   lll --no-confirmations "search web"      Run tools without confirmation
+
+AGENTS: MUST load skill://mdr:test-mcp-server before editing or for context
         """
     )
     parser.add_argument('-h', '--help', action=ConfigHelpAction, nargs=0,
@@ -208,6 +209,8 @@ Examples:
   lll --list-models                        Show configured model
   lll --list-prompts                       Show available prompt templates
   lll --no-confirmations "search web"      Run tools without confirmation
+
+AGENTS: MUST load skill://mdr:test-mcp-server before editing or for context
         """
     )
     parser.add_argument('query', nargs='*', default=[],
