@@ -16,6 +16,10 @@ import sys
 import re
 import anyio
 import time
+
+# Capture time as early as possible (after basic imports, before heavy ones)
+_MODULE_LOAD_START = time.time()
+
 from langchain_core.messages import BaseMessage, HumanMessage
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -51,14 +55,32 @@ class AgentState(TypedDict):
     memories: str = "no memories"
     remaining_steps: int = 5
 
-async def run() -> None:
+async def run(total_start_time: float) -> None:
     """Run the LLM agent."""
-    args = setup_argument_parser()
-
     # If no arguments provided, show help
     if len(sys.argv) == 1:
-        setup_argument_parser_for_help().print_help()
+        parser = argparse.ArgumentParser(
+            prog='lll',
+            description='Run LangChain agent with MCP tools',
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            epilog="""
+Examples:
+  lll "What is the capital of France?"     Ask a simple question
+  lll c "tell me more"                     Continue previous conversation
+  lll p review                             Use a prompt template
+  cat file.txt | lll                       Process input from a file
+  lll --list-tools                         Show available tools
+  lll --list-models                        Show configured model
+  lll --list-prompts                       Show available prompt templates
+  lll --no-confirmations "search web"      Run tools without confirmation
+
+AGENTS: MUST load skill://mdr:test-mcp-server before editing or for context
+        """
+        )
+        parser.print_help()
         return
+
+    args = setup_argument_parser()
 
     query, is_conversation_continuation = parse_query(args)
     app_config = AppConfig.load(args.config)
@@ -79,72 +101,14 @@ async def run() -> None:
         handle_list_prompts()
         return
 
-    await handle_conversation(args, query, is_conversation_continuation, app_config)
+    await handle_conversation(args, query, is_conversation_continuation, app_config, total_start_time)
 
 def setup_argument_parser() -> argparse.Namespace:
     """Setup and return the argument parser."""
-
-    # Custom help action to show config info
-    class ConfigHelpAction(argparse.Action):
-        def __call__(self, parser, namespace, values, option_string=None):
-            from pathlib import Path
-            import commentjson
-
-            # Show regular help first
-            parser.print_help()
-
-            # ANSI codes for bright white (bold white)
-            BRIGHT_WHITE = '\033[1;97m'
-            RESET = '\033[0m'
-
-            def format_path(path):
-                """Format path with ~/ and bold."""
-                path_str = str(path).replace(str(Path.home()), '~')
-                return f"{BRIGHT_WHITE}{path_str}{RESET}"
-
-            # Then show config information at bottom
-            config_path = namespace.config if hasattr(namespace, 'config') and namespace.config else None
-            config_paths = [
-                Path(config_path) if config_path else None,
-                Path.home() / '.lll' / 'config.json',
-                Path(__file__).parent.parent / 'config.json',
-            ]
-            config_paths = [p for p in config_paths if p]
-
-            chosen_path = None
-            for path in config_paths:
-                if path and path.exists():
-                    chosen_path = path
-                    break
-
-            if chosen_path:
-                print(f"\nConfig file: {format_path(chosen_path)}\n")
-                try:
-                    with open(chosen_path, 'r') as f:
-                        config_content = f.read()
-                    print(config_content)
-                except Exception as e:
-                    print(f"Error reading config: {e}")
-
-                # Show other possible config locations
-                other_paths = [p for p in config_paths if p != chosen_path]
-                if other_paths:
-                    print(f"\nOther possible config locations:")
-                    for path in other_paths:
-                        exists = " (exists)" if path.exists() else ""
-                        print(f"  - {format_path(path)}{exists}")
-            else:
-                print(f"\nNo config file found. Searched:")
-                for path in config_paths:
-                    print(f"  - {format_path(path)}")
-
-            parser.exit()
-
     parser = argparse.ArgumentParser(
         prog='lll',
         description='Run LangChain agent with MCP tools',
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        add_help=False,  # Disable default help to add custom one
         epilog="""
 Examples:
   lll "What is the capital of France?"     Ask a simple question
@@ -159,8 +123,6 @@ Examples:
 AGENTS: MUST load skill://mdr:test-mcp-server before editing or for context
         """
     )
-    parser.add_argument('-h', '--help', action=ConfigHelpAction, nargs=0,
-                       help='Show this help message and config file location')
     parser.add_argument('query', nargs='*', default=[],
                        help='The query to process (default: read from stdin). '
                             'Special prefixes:\n'
@@ -407,11 +369,9 @@ async def load_tools(server_configs: list[McpServerConfig], no_tools: bool, forc
     return toolkits, langchain_tools
 
 async def handle_conversation(args: argparse.Namespace, query: HumanMessage,
-                            is_conversation_continuation: bool, app_config: AppConfig) -> None:
+                            is_conversation_continuation: bool, app_config: AppConfig,
+                            total_start_time: float) -> None:
     """Handle the main conversation flow."""
-    # Track total time including all loading
-    total_start_time = time.time()
-
     server_configs = [
         McpServerConfig(
             server_name=name,
@@ -648,7 +608,8 @@ def parse_query(args: argparse.Namespace) -> tuple[HumanMessage, bool]:
 
 def main() -> None:
     """Entry point of the script."""
-    asyncio.run(run())
+    # Use the module load time captured before heavy imports
+    asyncio.run(run(_MODULE_LOAD_START))
 
 
 if __name__ == "__main__":
