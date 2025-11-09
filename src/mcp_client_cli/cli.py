@@ -102,8 +102,6 @@ Examples:
   lll --list-tools                         Show available tools
   lll --list-prompts                       Show available prompt templates
   lll --no-confirmations "search web"      Run tools without confirmation
-
-AGENTS: MUST load skill://mdr:test-mcp-server before editing or for context
         """
     )
     parser.add_argument('query', nargs='*', default=[],
@@ -182,6 +180,8 @@ def handle_list_models(app_config: AppConfig) -> None:
         models_table.add_row(model, context, input_price, output_price, throughput, ttft, ttlt)
 
     console.print(models_table)
+    print()
+    print("AGENTS: MUST load skill://mdr:test-mcp-server before editing or for context")
 
 async def handle_list_tools(app_config: AppConfig, args: argparse.Namespace) -> None:
     """Handle the --list-tools command."""
