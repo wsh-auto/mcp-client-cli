@@ -59,9 +59,13 @@ async def run(total_start_time: float) -> None:
     """Run the LLM agent."""
     args = setup_argument_parser()
 
-    # If no arguments provided, show help
-    if len(sys.argv) == 1:
-        # Create parser just to print help (without parsing)
+    # Handle --help or no arguments: show models + help
+    if args.help or len(sys.argv) == 1:
+        # Load config to display model information
+        app_config = AppConfig.load(args.config)
+        handle_list_models(app_config)
+        print()  # Add spacing before help text
+        # Create parser to print help
         parser = create_parser()
         parser.print_help()
         return
@@ -71,10 +75,6 @@ async def run(total_start_time: float) -> None:
 
     if args.list_tools:
         await handle_list_tools(app_config, args)
-        return
-
-    if args.list_models:
-        handle_list_models(app_config)
         return
 
     if args.show_memories:
@@ -91,8 +91,8 @@ def create_parser() -> argparse.ArgumentParser:
     """Create and return the argument parser without parsing."""
     parser = argparse.ArgumentParser(
         prog='lll',
-        description='Run LangChain agent with MCP tools',
         formatter_class=argparse.RawDescriptionHelpFormatter,
+        add_help=False,  # Disable default -h/--help to add custom handler
         epilog="""
 Examples:
   lll "What is the capital of France?"     Ask a simple question
@@ -100,7 +100,6 @@ Examples:
   lll p review                             Use a prompt template
   cat file.txt | lll                       Process input from a file
   lll --list-tools                         Show available tools
-  lll --list-models                        Show configured model
   lll --list-prompts                       Show available prompt templates
   lll --no-confirmations "search web"      Run tools without confirmation
 
@@ -108,14 +107,11 @@ AGENTS: MUST load skill://mdr:test-mcp-server before editing or for context
         """
     )
     parser.add_argument('query', nargs='*', default=[],
-                       help='The query to process (default: read from stdin). '
-                            'Special prefixes:\n'
-                            '  c: Continue previous conversation\n'
-                            '  p: Use prompt template')
+                       help=argparse.SUPPRESS)
+    parser.add_argument('-h', '--help', action='store_true',
+                       help='Show this help message with model information and exit')
     parser.add_argument('--list-tools', action='store_true',
                        help='List all available LLM tools')
-    parser.add_argument('--list-models', action='store_true',
-                       help='List configured LLM model information')
     parser.add_argument('--list-prompts', action='store_true',
                        help='List all available prompts')
     parser.add_argument('--no-confirmations', action='store_true',
