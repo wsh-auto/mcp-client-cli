@@ -519,11 +519,26 @@ async def handle_conversation(args: argparse.Namespace, query: HumanMessage,
             # Show timing information if we got a response
             if first_token_time is not None:
                 ttft = first_token_time - start_time
-                print(f"⏱️  TTFT: {ttft:.2f}s", file=sys.stderr, end="")
+
+                # Format model name (truncate if too long)
+                model_name = app_config.llm.model
+                if len(model_name) > 40:
+                    model_name = model_name[:37] + "..."
+
+                print(f"⏱️  [{model_name}] TTFT: {ttft:.2f}s", file=sys.stderr, end="")
 
                 if last_token_time is not None:
                     ttlt = last_token_time - start_time
-                    print(f"  |  TTLT: {ttlt:.2f}s", file=sys.stderr)
+                    print(f"  |  TTLT: {ttlt:.2f}s", file=sys.stderr, end="")
+
+                # Detect thinking/reasoning models
+                thinking_models = ["o1", "o3", "deepseek-r1", "qwen-qwq"]
+                is_thinking = any(tm in model_name.lower() for tm in thinking_models)
+
+                if is_thinking:
+                    print(f"  |  [THINKING]", file=sys.stderr, end="")
+
+                print(file=sys.stderr)  # New line at end
 
         await conversation_manager.save_id(thread_id, checkpointer.conn)
 
