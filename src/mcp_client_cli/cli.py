@@ -476,9 +476,10 @@ async def handle_conversation(args: argparse.Namespace, query: HumanMessage,
         output = OutputHandler(text_only=args.text_only, only_last_message=args.no_intermediates)
         output.start()
 
-        # Track timing for TTFT (Time To First Token)
+        # Track timing for TTFT (Time To First Token) and TTLT (Time To Last Token)
         start_time = time.time()
         first_token_time = None
+        last_token_time = None
 
         try:
             async for chunk in agent_executor.astream(
@@ -487,13 +488,14 @@ async def handle_conversation(args: argparse.Namespace, query: HumanMessage,
                 config={"configurable": {"thread_id": thread_id, "user_id": "myself"},
                        "recursion_limit": 100}
             ):
-                # Record first token time
-                if first_token_time is None:
-                    from langchain_core.messages import AIMessageChunk
-                    if isinstance(chunk, tuple) and chunk[0] == "messages":
-                        message_chunk = chunk[1][0] if len(chunk[1]) > 0 else None
-                        if isinstance(message_chunk, AIMessageChunk) and message_chunk.content:
+                # Record first and last token times
+                from langchain_core.messages import AIMessageChunk
+                if isinstance(chunk, tuple) and chunk[0] == "messages":
+                    message_chunk = chunk[1][0] if len(chunk[1]) > 0 else None
+                    if isinstance(message_chunk, AIMessageChunk) and message_chunk.content:
+                        if first_token_time is None:
                             first_token_time = time.time()
+                        last_token_time = time.time()
 
                 output.update(chunk)
                 if not args.no_confirmations:
@@ -515,7 +517,11 @@ async def handle_conversation(args: argparse.Namespace, query: HumanMessage,
             # Show timing information if we got a response
             if first_token_time is not None:
                 ttft = first_token_time - start_time
-                print(f"\n⏱️  TTFT: {ttft:.2f}s", file=sys.stderr)
+                print(f"⏱️  TTFT: {ttft:.2f}s", file=sys.stderr, end="")
+
+                if last_token_time is not None:
+                    ttlt = last_token_time - start_time
+                    print(f"  |  TTLT: {ttlt:.2f}s", file=sys.stderr)
 
         await conversation_manager.save_id(thread_id, checkpointer.conn)
 
