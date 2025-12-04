@@ -94,6 +94,12 @@ class OutputHandler:
                     md += content
                 elif isinstance(content, list) and len(content) > 0 and isinstance(content[0], dict) and "text" in content[0]:
                     md += content[0]["text"]
+
+                # Extract and display reasoning content (for GPT-5, o1, o3, o4-mini)
+                reasoning_content = self._extract_reasoning(message_chunk)
+                if reasoning_content:
+                    # Add reasoning with visual marker
+                    md += f"\n\n_💭 Reasoning:_\n\n> {reasoning_content}\n\n"
         # If this is a final value
         elif isinstance(chunk, dict) and "messages" in chunk:
             # Print a newline after the complete message
@@ -183,3 +189,39 @@ class OutputHandler:
         if not is_tool_call_confirmed:
             return False
         return True
+
+    def _extract_reasoning(self, message_chunk: AIMessageChunk) -> str | None:
+        """
+        Extract reasoning content from a message chunk.
+        Supports multiple formats used by different LLM providers.
+        """
+        # Method 1: Direct attribute (older API format)
+        if hasattr(message_chunk, 'reasoning_content') and message_chunk.reasoning_content:
+            return message_chunk.reasoning_content
+
+        # Method 2: In response_metadata (some LangChain versions)
+        if hasattr(message_chunk, 'response_metadata') and message_chunk.response_metadata:
+            reasoning = message_chunk.response_metadata.get('reasoning_content')
+            if reasoning:
+                return reasoning
+
+        # Method 3: In additional_kwargs (Responses API format)
+        if hasattr(message_chunk, 'additional_kwargs') and message_chunk.additional_kwargs:
+            # Check for reasoning_summary (Responses API)
+            if 'reasoning_summary' in message_chunk.additional_kwargs:
+                reasoning_summary = message_chunk.additional_kwargs['reasoning_summary']
+                if isinstance(reasoning_summary, dict):
+                    return reasoning_summary.get('text')
+                elif isinstance(reasoning_summary, str):
+                    return reasoning_summary
+            # Fallback to reasoning_content
+            elif 'reasoning_content' in message_chunk.additional_kwargs:
+                return message_chunk.additional_kwargs.get('reasoning_content')
+
+        # Method 4: Check content for reasoning markers (Responses API with output_version="responses/v1")
+        if hasattr(message_chunk, 'content') and isinstance(message_chunk.content, list):
+            for item in message_chunk.content:
+                if isinstance(item, dict) and item.get('type') == 'reasoning_summary':
+                    return item.get('text')
+
+        return None

@@ -126,6 +126,9 @@ Examples:
                        help='Show user memories')
     parser.add_argument('--model',
                        help='Override the model specified in config')
+    parser.add_argument('--reasoning',
+                       choices=['none', 'low', 'medium', 'high'],
+                       help="Reasoning effort for GPT-5.1 (none/low/medium/high)")
     parser.add_argument('--config',
                        help='Path to config file (default: ~/.lll/config.json)')
     parser.add_argument('--debug', action='store_true',
@@ -285,6 +288,38 @@ async def load_tools(server_configs: list[McpServerConfig], enable_mcp: bool, fo
     langchain_tools.append(save_memory)
     return toolkits, langchain_tools
 
+def _extract_token_usage(chunk) -> str | None:
+    """Extract token usage information from a chunk and format for display."""
+    usage = None
+
+    # Try response_metadata (most common location)
+    if hasattr(chunk, 'response_metadata') and chunk.response_metadata:
+        usage = chunk.response_metadata.get('token_usage')
+
+    # Try usage_metadata (newer LangChain versions)
+    if not usage and hasattr(chunk, 'usage_metadata') and chunk.usage_metadata:
+        usage = chunk.usage_metadata
+
+    # Try additional_kwargs
+    if not usage and hasattr(chunk, 'additional_kwargs') and chunk.additional_kwargs:
+        usage = chunk.additional_kwargs.get('usage')
+
+    if not usage:
+        return None
+
+    # Format token usage
+    prompt_tokens = usage.get('prompt_tokens', 0)
+    completion_tokens = usage.get('completion_tokens', 0)
+    reasoning_tokens = usage.get('reasoning_tokens', 0)
+
+    if reasoning_tokens > 0:
+        # Show reasoning tokens separately
+        return f"Tokens: {prompt_tokens}P + {reasoning_tokens}R + {completion_tokens}C"
+    else:
+        # No reasoning tokens, show simple format
+        total = usage.get('total_tokens', prompt_tokens + completion_tokens)
+        return f"Tokens: {total} ({prompt_tokens}P + {completion_tokens}C)"
+
 async def handle_simple_conversation(model, query: HumanMessage, app_config: AppConfig,
                                    args: argparse.Namespace, total_start_time: float) -> None:
     """Handle simple conversation without MCP tools (fast path)."""
@@ -292,6 +327,7 @@ async def handle_simple_conversation(model, query: HumanMessage, app_config: App
     start_time = time.time()
     first_token_time = None
     last_token_time = None
+    last_chunk = None  # Keep track of last chunk for usage info
 
     try:
         # Simple streaming without agent infrastructure
@@ -301,6 +337,8 @@ async def handle_simple_conversation(model, query: HumanMessage, app_config: App
         ]
 
         async for chunk in model.astream(messages):
+            last_chunk = chunk  # Save for usage extraction
+
             # Record first and last token times
             if chunk.content:
                 if first_token_time is None:
@@ -310,6 +348,44 @@ async def handle_simple_conversation(model, query: HumanMessage, app_config: App
             # Output the chunk (simple text output)
             if chunk.content:
                 print(chunk.content, end="", flush=True)
+
+            # Output reasoning content if present (for GPT-5, o1, o3, o4-mini)
+            # Check for reasoning_content in multiple possible locations
+            reasoning_content = None
+
+            # Method 1: Direct attribute (older API format)
+            if hasattr(chunk, 'reasoning_content') and chunk.reasoning_content:
+                reasoning_content = chunk.reasoning_content
+
+            # Method 2: In response_metadata (some LangChain versions)
+            if not reasoning_content and hasattr(chunk, 'response_metadata') and chunk.response_metadata:
+                reasoning_content = chunk.response_metadata.get('reasoning_content')
+
+            # Method 3: In additional_kwargs (Responses API format)
+            if not reasoning_content and hasattr(chunk, 'additional_kwargs') and chunk.additional_kwargs:
+                # Check for reasoning_summary (Responses API)
+                if 'reasoning_summary' in chunk.additional_kwargs:
+                    reasoning_summary = chunk.additional_kwargs['reasoning_summary']
+                    if isinstance(reasoning_summary, dict):
+                        reasoning_content = reasoning_summary.get('text')
+                    elif isinstance(reasoning_summary, str):
+                        reasoning_content = reasoning_summary
+                # Fallback to reasoning_content
+                elif 'reasoning_content' in chunk.additional_kwargs:
+                    reasoning_content = chunk.additional_kwargs.get('reasoning_content')
+
+            # Method 4: Check content for reasoning markers (Responses API with output_version="responses/v1")
+            # The Responses API may include reasoning in structured content
+            if not reasoning_content and hasattr(chunk, 'content') and isinstance(chunk.content, list):
+                for item in chunk.content:
+                    if isinstance(item, dict) and item.get('type') == 'reasoning_summary':
+                        reasoning_content = item.get('text')
+                        break
+
+            if reasoning_content:
+                GRAY = '\033[90m'
+                RESET = '\033[0m'
+                print(f"\n\n{GRAY}💭 Reasoning:{RESET}\n{reasoning_content}", end="", flush=True)
 
     except Exception as e:
         # Check if this is a model-related error
@@ -330,6 +406,10 @@ async def handle_simple_conversation(model, query: HumanMessage, app_config: App
 
             # Format model name (truncate if too long)
             model_name = app_config.llm.model
+            # Add reasoning level if present
+            reasoning = args.reasoning if args.reasoning else (app_config.llm.reasoning_effort if hasattr(app_config.llm, 'reasoning_effort') else None)
+            if reasoning:
+                model_name = f"{model_name} (reasoning:{reasoning})"
             if len(model_name) > 40:
                 model_name = model_name[:37] + "..."
 
@@ -347,6 +427,13 @@ async def handle_simple_conversation(model, query: HumanMessage, app_config: App
 
             # Show total time including loading
             print(f"  |  Total: {total_time:.2f}s", file=sys.stderr, end="")
+
+            # Extract and display token usage if available
+            if last_chunk:
+                usage_str = _extract_token_usage(last_chunk)
+                if usage_str:
+                    print(f"  |  {usage_str}", file=sys.stderr, end="")
+
             print(RESET, file=sys.stderr)  # Reset color and new line at end
 
 async def handle_conversation(args: argparse.Namespace, query: HumanMessage,
@@ -364,11 +451,37 @@ async def handle_conversation(args: argparse.Namespace, query: HumanMessage,
     toolkits, tools = await load_tools(server_configs, args.mcp, args.force_refresh, args.debug)
 
     extra_body = {}
+    model_kwargs = {}
+
     if app_config.llm.base_url and "openrouter" in app_config.llm.base_url:
         extra_body = {"transforms": ["middle-out"]}
+
     # Override model if specified in command line
     if args.model:
         app_config.llm.model = args.model
+
+    # Determine reasoning effort setting
+    reasoning_effort = None
+    if args.reasoning:
+        reasoning_effort = args.reasoning
+    elif hasattr(app_config.llm, 'reasoning_effort') and app_config.llm.reasoning_effort:
+        reasoning_effort = app_config.llm.reasoning_effort
+
+    # Add reasoning_effort using proper Responses API format for OpenAI models
+    # Only send reasoning_effort for models that support it (GPT-5, o1, o3, o4-mini)
+    def supports_reasoning(model: str) -> bool:
+        """Check if model supports reasoning_effort parameter."""
+        model_lower = model.lower()
+        return any(x in model_lower for x in ['gpt-5', 'o1', 'o3', 'o4-mini'])
+
+    if reasoning_effort and supports_reasoning(app_config.llm.model):
+        # Use Responses API format for reasoning models (GPT-5, o1, o3, o4-mini)
+        model_kwargs["reasoning"] = {
+            "effort": reasoning_effort,
+            "summary": "auto"
+        }
+        # Also add to extra_body for LiteLLM proxy compatibility
+        extra_body["reasoning_effort"] = reasoning_effort
 
     # Build init_chat_model kwargs, only include provider if specified
     init_kwargs = {
@@ -380,8 +493,14 @@ async def handle_conversation(args: argparse.Namespace, query: HumanMessage,
             "X-Title": "mcp-client-cli",
             "HTTP-Referer": "https://github.com/adhikasp/mcp-client-cli",
         },
-        "extra_body": extra_body
+        "extra_body": extra_body,
+        "model_kwargs": model_kwargs
     }
+
+    # Enable Responses API for reasoning models
+    if reasoning_effort:
+        init_kwargs["use_responses_api"] = True
+        init_kwargs["output_version"] = "responses/v1"
     if app_config.llm.provider:
         init_kwargs["model_provider"] = app_config.llm.provider
 
@@ -436,6 +555,7 @@ async def handle_conversation(args: argparse.Namespace, query: HumanMessage,
         start_time = time.time()
         first_token_time = None
         last_token_time = None
+        last_ai_chunk = None  # Track last AI message chunk for usage info
 
         try:
             async for chunk in agent_executor.astream(
@@ -448,10 +568,12 @@ async def handle_conversation(args: argparse.Namespace, query: HumanMessage,
                 from langchain_core.messages import AIMessageChunk
                 if isinstance(chunk, tuple) and chunk[0] == "messages":
                     message_chunk = chunk[1][0] if len(chunk[1]) > 0 else None
-                    if isinstance(message_chunk, AIMessageChunk) and message_chunk.content:
-                        if first_token_time is None:
-                            first_token_time = time.time()
-                        last_token_time = time.time()
+                    if isinstance(message_chunk, AIMessageChunk):
+                        last_ai_chunk = message_chunk  # Save for usage extraction
+                        if message_chunk.content:
+                            if first_token_time is None:
+                                first_token_time = time.time()
+                            last_token_time = time.time()
 
                 output.update(chunk)
                 if not args.no_confirmations:
@@ -477,6 +599,10 @@ async def handle_conversation(args: argparse.Namespace, query: HumanMessage,
 
                 # Format model name (truncate if too long)
                 model_name = app_config.llm.model
+                # Add reasoning level if present
+                reasoning = args.reasoning if args.reasoning else (app_config.llm.reasoning_effort if hasattr(app_config.llm, 'reasoning_effort') else None)
+                if reasoning:
+                    model_name = f"{model_name} (reasoning:{reasoning})"
                 if len(model_name) > 40:
                     model_name = model_name[:37] + "..."
 
@@ -502,6 +628,12 @@ async def handle_conversation(args: argparse.Namespace, query: HumanMessage,
 
                 if is_thinking:
                     print(f"  |  [THINKING]", file=sys.stderr, end="")
+
+                # Extract and display token usage if available
+                if last_ai_chunk:
+                    usage_str = _extract_token_usage(last_ai_chunk)
+                    if usage_str:
+                        print(f"  |  {usage_str}", file=sys.stderr, end="")
 
                 print(RESET, file=sys.stderr)  # Reset color and new line at end
 

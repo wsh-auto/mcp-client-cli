@@ -18,11 +18,12 @@ class LLMConfig:
     even if the model string references other providers (e.g., "anthropic/claude-haiku-4.5").
     The provider indicates the API format, not the actual model provider.
     """
-    model: str = "gpt-4o"
+    model: str = "google/gemini-2.5-flash"
     provider: Optional[str] = None
     api_key: Optional[str] = None
     temperature: float = 0
     base_url: Optional[str] = None
+    reasoning_effort: Optional[str] = None
 
     @classmethod
     def from_dict(cls, config: dict) -> "LLMConfig":
@@ -30,9 +31,10 @@ class LLMConfig:
         return cls(
             model=config.get("model", cls.model),
             provider=config.get("provider"),
-            api_key=config.get("api_key", os.getenv("LLM_API_KEY", os.getenv("OPENAI_API_KEY", ""))),
+            api_key=config.get("api_key", os.getenv("LITELLM_API_KEY", os.getenv("OPENAI_API_KEY", os.getenv("LLM_API_KEY", "")))),
             temperature=config.get("temperature", cls.temperature),
             base_url=config.get("base_url"),
+            reasoning_effort=config.get("reasoning_effort", cls.reasoning_effort),
         )
 
 @dataclass
