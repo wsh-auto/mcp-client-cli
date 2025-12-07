@@ -15,7 +15,7 @@ This act as alternative client beside Claude Desktop. Additionally you can use a
    pip install mcp-client-cli
    ```
 
-2. Create a `~/.lll/config.json` file to configure your LLM and MCP servers:
+2. Create a `~/.config/lll/config.json` file to configure your LLM and MCP servers:
    ```json
    {
      "systemPrompt": "You are an AI assistant helping a software engineer...",
@@ -54,7 +54,7 @@ This act as alternative client beside Claude Desktop. Additionally you can use a
    - See [CONFIG.md](CONFIG.md) for complete documentation of the configuration format
    - Use `requires_confirmation` to specify which tools need user confirmation before execution
    - The LLM API key can also be set via environment variables `LLM_API_KEY` or `OPENAI_API_KEY`
-   - The config file can be placed in either `~/.lll/config.json` or `$PWD/.lll/config.json`
+   - The config file can be placed in either `~/.config/lll/config.json` or `$PWD/.lll/config.json`
    - You can comment the JSON config file with `//` if you like to switch around the configuration
 
 3. Run the CLI:

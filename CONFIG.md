@@ -5,7 +5,7 @@ This document describes the configuration format for the MCP Client CLI. The con
 ## Configuration File Location
 
 The configuration file can be placed in either:
-- `~/.lll/config.json` (user's home directory)
+- `~/.config/lll/config.json` (user's home directory)
 - `mcp-server-config.json` (in the current working directory)
 
 ## Configuration Structure
