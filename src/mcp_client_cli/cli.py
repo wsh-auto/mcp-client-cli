@@ -184,7 +184,7 @@ def handle_list_models(app_config: AppConfig) -> None:
 
     console.print(models_table)
     print()
-    print("AGENTS: MUST load skill://mdr:test-mcp-server before editing or for context")
+    print("AGENTS: MUST load $mdr:test-mcp-server before editing or for context")
 
 async def handle_list_tools(app_config: AppConfig, args: argparse.Namespace) -> None:
     """Handle the --list-tools command."""
