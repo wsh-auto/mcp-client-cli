@@ -18,7 +18,7 @@ class LLMConfig:
     even if the model string references other providers (e.g., "anthropic/claude-haiku-4.5").
     The provider indicates the API format, not the actual model provider.
     """
-    model: str = "google/gemini-2.5-flash"
+    model: str = "google/gemini-3.0-flash"
     provider: Optional[str] = None
     api_key: Optional[str] = None
     temperature: float = 0

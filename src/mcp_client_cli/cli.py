@@ -175,7 +175,7 @@ def handle_list_models(app_config: AppConfig) -> None:
         ("anthropic/claude-haiku-4.5", "200K", "$1.00", "$5.00", "138 tok/s", "0.51s", "1.04s"),
         ("anthropic/claude-sonnet-4.5", "1M", "$3.00", "$15.00", "62 tok/s", "1.27s", "1.29s"),
         ("x-ai/grok-4-fast", "2M", "$0.20", "$0.50", "140 tok/s", "3.72s", "10.19s"),
-        ("openai/gpt-5.1", "400K", "$1.25", "$10.00", "67 tok/s", "7.31s", "7.82s"),
+        ("openai/gpt-5.2", "400K", "$1.25", "$10.00", "67 tok/s", "7.31s", "7.82s"),
         ("x-ai/grok-4", "256K", "$3.00", "$15.00", "33 tok/s", "15.59s", "45.09s"),
     ]
 
@@ -257,7 +257,7 @@ def show_model_error_and_list() -> None:
         ("anthropic/claude-haiku-4.5", "200K", "$1.00", "$5.00", "138 tok/s", "0.51s", "1.04s"),
         ("anthropic/claude-sonnet-4.5", "1M", "$3.00", "$15.00", "62 tok/s", "1.27s", "1.29s"),
         ("x-ai/grok-4-fast", "2M", "$0.20", "$0.50", "140 tok/s", "3.72s", "10.19s"),
-        ("openai/gpt-5.1", "400K", "$1.25", "$10.00", "67 tok/s", "7.31s", "7.82s"),
+        ("openai/gpt-5.2", "400K", "$1.25", "$10.00", "67 tok/s", "7.31s", "7.82s"),
         ("x-ai/grok-4", "256K", "$3.00", "$15.00", "33 tok/s", "15.59s", "45.09s"),
     ]
 
