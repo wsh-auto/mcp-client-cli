@@ -14,3 +14,4 @@ mcp-server-config.json
 
 .DS_Store
 repomix-output.md
+.env
